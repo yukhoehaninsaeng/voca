@@ -423,7 +423,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   <header>
     <div>
       <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노의 단어 학습</span>
+      <span class="logo-sub">영어 단어 학습 · by Claude AI</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -897,6 +897,38 @@ const TOEIC_PARTS={
   ]
 };
 
+/* ─── PERSIST (localStorage) ────────────────────────── */
+const LS={
+  save(){
+    try{
+      localStorage.setItem('vm-words',JSON.stringify(words));
+      localStorage.setItem('vm-sents',JSON.stringify(sents));
+      localStorage.setItem('vm-errCount',JSON.stringify(errCount));
+      localStorage.setItem('vm-sErrCount',JSON.stringify(sErrCount));
+      localStorage.setItem('vm-selectedPart',selectedPart||'all');
+      localStorage.setItem('vm-selectedCustom',selectedCustom||'');
+    }catch(e){}
+  },
+  load(){
+    try{
+      const w=localStorage.getItem('vm-words');
+      if(w)words=JSON.parse(w);
+      const s=localStorage.getItem('vm-sents');
+      if(s)sents=JSON.parse(s);
+      const ec=localStorage.getItem('vm-errCount');
+      if(ec)errCount=JSON.parse(ec);
+      const sec=localStorage.getItem('vm-sErrCount');
+      if(sec)sErrCount=JSON.parse(sec);
+      const sp=localStorage.getItem('vm-selectedPart');
+      if(sp)selectedPart=sp;
+      const sc=localStorage.getItem('vm-selectedCustom');
+      if(sc)selectedCustom=sc||null;
+    }catch(e){}
+  },
+  saveApiKey(k){try{localStorage.setItem('vm-apikey',k);}catch(e){}},
+  loadApiKey(){try{return localStorage.getItem('vm-apikey')||'';}catch(e){return'';}},
+};
+
 /* ─── STATE ─────────────────────────────────────────── */
 let API_KEY='';
 let aiCache={};
@@ -904,8 +936,8 @@ let words=[{word:'apple',meaning:'사과'},{word:'beautiful',meaning:'아름다�
 let errCount={};
 let sents=[{en:'It relieves my stress.',ko:'이것은 나의 스트레스를 풀어준다.'},{en:"It's cheaper, so I can save money.",ko:'이것은 더 싸서 돈을 절약할 수 있다.'},{en:'The price is reasonable.',ko:'가격이 저렴하다.'}];
 let sErrCount={};
-let selectedPart='all'; // 'all','p2','p3','p4','p5'
-let selectedCustom=null; // custom card id or null
+let selectedPart='all';
+let selectedCustom=null;
 let toeicErrCount={};
 
 // session stats
@@ -915,14 +947,35 @@ let tOk=0,tNg=0,tQueue=[],tIdx=0;
 let sOk=0,sNg=0,sAnswered=false,sQueue=[],sIdx=0,sentMode='blank';
 let tsOk=0,tsNg=0,tsAnswered=false,tsQueue=[],tsIdx=0,toeicSentMode='blank';
 
+// 앱 시작 시 저장된 데이터 복원
+LS.load();
+
 /* ─── THEME ─────────────────────────────────────────── */
 function toggleTheme(){document.body.classList.toggle('light');const l=document.body.classList.contains('light');localStorage.setItem('vm-theme',l?'light':'dark');document.querySelector('meta[name="theme-color"]').setAttribute('content',l?'#f5f5f8':'#0f0f13');}
 (function(){const s=localStorage.getItem('vm-theme');if(s==='light'){document.body.classList.add('light');document.querySelector('meta[name="theme-color"]').setAttribute('content','#f5f5f8');}})();
 
 /* ─── API ────────────────────────────────────────────── */
-function saveApiKey(){const k=document.getElementById('apiKeyInput').value.trim();if(!k)return;API_KEY=k;document.getElementById('apiModal').style.display='none';const b=document.getElementById('apiStatus');b.textContent='AI ON';b.style.background='#1eca8b';}
+function saveApiKey(){
+  const k=document.getElementById('apiKeyInput').value.trim();if(!k)return;
+  API_KEY=k;LS.saveApiKey(k);
+  document.getElementById('apiModal').style.display='none';
+  const b=document.getElementById('apiStatus');b.textContent='AI ON';b.style.background='#1eca8b';
+}
 function skipApiKey(){document.getElementById('apiModal').style.display='none';}
 function showApiModal(){document.getElementById('apiModal').style.display='flex';}
+
+// 저장된 API 키 복원 + 모달 조건 처리
+(function(){
+  const saved=LS.loadApiKey();
+  if(saved){
+    API_KEY=saved;
+    document.getElementById('apiModal').style.display='none';
+    document.getElementById('apiKeyInput').value=saved;
+    const b=document.getElementById('apiStatus');b.textContent='AI ON';b.style.background='#1eca8b';
+  }
+  // API 키 없어도 모달 안 띄움 — 사용자가 필요할 때 버튼으로 열 수 있음
+  document.getElementById('apiModal').style.display='none';
+})();
 
 /* ─── CANVAS ─────────────────────────────────────────── */
 const PAL=[['#1a2a4a','#0d1f3c','#5b9df9'],['#0d2e22','#0a2019','#1eca8b'],['#2e1f0a','#231600','#f5a623'],['#2a0d22','#1f0a18','#e86daa'],['#1a0d3a','#130929','#9b7cf8'],['#0d2a1a','#091f12','#4ec98a']];
@@ -934,15 +987,15 @@ async function getAI(word,meaning){if(aiCache[word])return aiCache[word];if(!API
 
 /* ─── WORD LIST ──────────────────────────────────────── */
 function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=words.length===0;if(!words.length){el.innerHTML='<div class="empty-msg">단어를 추가하면<br>AI 이미지 연상법을 만들어줘요 ✨</div>';return;}el.innerHTML=words.map((w,i)=>{const ec=errCount[i]||0;return`<div class="wi"><span class="wd">${w.word}</span><span class="mn">${w.meaning}</span>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delWord(${i})">×</button></div>`;}).join('');}
-function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;words.push({word:w,meaning:m});wi.value='';mi.value='';renderWordList();wi.focus();}
-function delWord(i){words.splice(i,1);delete errCount[i];renderWordList();}
+function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;words.push({word:w,meaning:m});wi.value='';mi.value='';renderWordList();wi.focus();LS.save();}
+function delWord(i){words.splice(i,1);delete errCount[i];renderWordList();LS.save();}
 document.getElementById('mi').addEventListener('keydown',e=>{if(e.key==='Enter')addWord();});
 document.getElementById('wi').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mi').focus();});
 
 /* ─── SENT LIST ──────────────────────────────────────── */
 function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=sents.length===0;if(!sents.length){el.innerHTML='<div class="empty-msg">문장을 추가해 학습해요 ✨</div>';return;}el.innerHTML=sents.map((s,i)=>{const ec=sErrCount[i]||0;return`<div class="wi swi"><div class="swi-row"><div class="swi-texts"><div class="sent-en">${s.en}</div><div class="sent-ko">${s.ko}</div></div>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delSent(${i})">×</button></div></div>`;}).join('');}
-function addSent(){const ei=document.getElementById('si-en'),ki=document.getElementById('si-ko');const e=ei.value.trim(),k=ki.value.trim();if(!e||!k)return;sents.push({en:e,ko:k});ei.value='';ki.value='';renderSentList();ei.focus();}
-function delSent(i){sents.splice(i,1);delete sErrCount[i];renderSentList();}
+function addSent(){const ei=document.getElementById('si-en'),ki=document.getElementById('si-ko');const e=ei.value.trim(),k=ki.value.trim();if(!e||!k)return;sents.push({en:e,ko:k});ei.value='';ki.value='';renderSentList();ei.focus();LS.save();}
+function delSent(i){sents.splice(i,1);delete sErrCount[i];renderSentList();LS.save();}
 document.getElementById('si-ko').addEventListener('keydown',e=>{if(e.key==='Enter')addSent();});
 
 /* ─── CUSTOM CARD DATA ───────────────────────────────── */
@@ -1312,7 +1365,7 @@ function showFlash(){
   setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);getAI(w.word,w.meaning);
 }
 async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-section"><div class="ai-label mem-lbl">🖼 이미지 연상</div><div class="ai-text">${ai.scene}</div></div>`;if(ai.memory)h+=`<div class="ai-section"><div class="ai-label mem-lbl2">💡 기억법</div><div class="ai-text">${ai.memory}</div></div>`;if(ai.sentence){const p=ai.sentence.split('|');h+=`<div class="ai-section"><div class="ai-label ex-lbl">📖 예문</div><div class="ai-text"><em>${p[0]?.trim()||''}</em>${p[1]?'<br>'+p[1].trim():''}</div></div>`;}el.innerHTML=h||'<div style="font-size:.73rem;color:var(--text3);text-align:center;padding:.5rem">API 키를 설정하면 AI 연상법이 표시돼요</div>';}
-function markFlash(wi,know){if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();showFlash();}
+function markFlash(wi,know){if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
 
 /* ─── QUIZ ───────────────────────────────────────────── */
 function initQuiz(){if(words.length<2){document.getElementById('quiz-body').innerHTML='<div class="empty-msg" style="padding:3rem">퀴즈는 단어 2개 이상 필요해요</div>';return;}qQueue=buildQueue([...Array(words.length).keys()],errCount);qIdx=0;qOk=0;qNg=0;qAnswered=false;repeatBanner('q-rq-banner','q-repeat',errCount);updateQStats();showQuiz();}
@@ -1324,7 +1377,7 @@ function showQuiz(){
   const opts=[...others,correct].sort(()=>Math.random()-.5);qAnswered=false;
   document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${correct.word}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts">${opts.map(o=>`<button class="qopt" data-meaning="${o.meaning.replace(/"/g,'&quot;')}" onclick="answerQuiz(this,'${o.meaning.replace(/'/g,"\\'")}','${correct.meaning.replace(/'/g,"\\'")}',${wi})">${o.meaning}</button>`).join('')}</div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 →</button>`;
 }
-async function answerQuiz(btn,chosen,correct,wi){if(qAnswered)return;qAnswered=true;document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});const ok=chosen===correct;if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;}updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';const w=words[wi],pal=palette(wi);fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${correct}`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';document.getElementById('qnext').style.display='block';}
+async function answerQuiz(btn,chosen,correct,wi){if(qAnswered)return;qAnswered=true;document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});const ok=chosen===correct;if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;}updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';const w=words[wi],pal=palette(wi);fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${correct}`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';document.getElementById('qnext').style.display='block';}
 function nextQuiz(){qIdx++;showQuiz();}
 
 /* ─── TYPE ───────────────────────────────────────────── */
@@ -1517,10 +1570,12 @@ function renderVoiceCard(s,si){
       <div class="voice-ko">${s.ko}</div>
       <div style="font-size:.7rem;color:var(--text3);font-weight:700;margin-bottom:1rem">위 한국어를 영어로 말해보세요</div>
       <div class="mic-wrap">
-        <button class="mic-btn" id="micBtn" onclick="toggleRecording(${si})" aria-label="마이크">
+        <button class="mic-btn" id="micBtn"
+          onpointerdown="pttStart(${si})" onpointerup="pttEnd(${si})" onpointercancel="pttEnd(${si})"
+          oncontextmenu="return false" aria-label="마이크 — 누르는 동안 녹음">
           <span class="mic-icon">🎤</span>
         </button>
-        <span class="mic-label" id="micLabel">탭하여 말하기</span>
+        <span class="mic-label" id="micLabel">누르고 있는 동안 녹음</span>
       </div>
       <button class="shadow-btn" id="shadowBtn" onclick="playShadow('${s.en.replace(/'/g,"\\'")}')">
         🔊 섀도잉 — 먼저 듣기
@@ -1553,10 +1608,21 @@ const isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent)||
   (/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream);
 const isChrome=!isSafari&&(!!window.chrome||navigator.userAgent.includes('Chrome'));
 
-/* 마이크 토글 */
-function toggleRecording(si){
-  if(isRecording){stopRecording(si,true);}
-  else{startRecording(si);}
+/* PTT — 누르는 동안 녹음, 떼면 자동 채점 */
+function pttStart(si){
+  if(isRecording)return;
+  startRecording(si);
+}
+function pttEnd(si){
+  if(!isRecording)return;
+  // Safari: onend에서 처리, Chrome: 여기서 중지 후 onresult isFinal 처리
+  if(recognition){
+    try{recognition.stop();}catch(e){}
+  }
+  const btn=document.getElementById('micBtn');
+  const lbl=document.getElementById('micLabel');
+  if(btn)btn.classList.remove('recording');
+  if(lbl)lbl.textContent='처리 중...';
 }
 
 let vSilenceTimer=null;  // 무음 타임아웃

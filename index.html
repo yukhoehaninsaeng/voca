@@ -428,7 +428,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   <header>
     <div>
       <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노 단어 학습</span>
+      <span class="logo-sub">영어 단어 학습 · by Claude AI</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -1297,6 +1297,8 @@ function go(tab){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   document.getElementById('s-'+tab).classList.add('on');
   window.scrollTo({top:0,behavior:'smooth'});
+  // 현재 탭 저장
+  try{localStorage.setItem('vm-tab',tab);}catch(e){}
   if(tab==='learn')renderLearnScreen();
   if(tab==='flash')initFlash();
   if(tab==='quiz')initQuiz();
@@ -1833,18 +1835,23 @@ function pttStart(si){
 function pttEnd(si){
   _pttReleased=true;
   if(!isRecording)return;
-  isRecording=false; // 먼저 false로 — onend에서 중복처리 방지
+  isRecording=false; // onend 중복처리 방지
   if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
+  // 손 뗀 시점의 화면 텍스트를 snapshot으로 저장 (onend 전에 확보)
+  const res=document.getElementById('sttResult');
+  if(res&&res.classList.contains('has-text')){
+    vInterimSnapshot=res.textContent.trim();
+  }
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
   if(btn)btn.classList.remove('recording');
   if(lbl)lbl.textContent='처리 중...';
   if(recognition){try{recognition.stop();}catch(e){}}
-  // onend에서 transcript 처리됨
 }
 
 let vSilenceTimer=null;
 let vFinalTranscript='';
+let vInterimSnapshot=''; // pttEnd 시점의 interim 텍스트 보존
 
 function startRecording(si){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1856,8 +1863,8 @@ function startRecording(si){
   recognition=new SpeechRecognition();
   recognition.lang='en-US';
   recognition.maxAlternatives=1;
-  recognition.continuous=false;
-  recognition.interimResults=isChrome; // Safari: false, Chrome: true
+  recognition.continuous=true;    // 시간 제한 없음 — 손 뗄 때까지 계속
+  recognition.interimResults=true;
 
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
@@ -1869,6 +1876,7 @@ function startRecording(si){
   _pttReleased=false;
   vStartTime=Date.now();
   vFinalTranscript='';
+  vInterimSnapshot='';
 
   recognition.onresult=(e)=>{
     let interim='';
@@ -1877,46 +1885,52 @@ function startRecording(si){
       else interim+=e.results[i][0].transcript;
     }
     const display=(vFinalTranscript+interim).trim();
+    // interim도 항상 snapshot에 저장 — pttEnd 시점에 못 잡을 경우 대비
+    vInterimSnapshot=display;
     if(res&&display){res.textContent=display;res.classList.add('has-text');}
   };
 
   recognition.onerror=(e)=>{
-    if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
+    if(e.error==='aborted'||e.error==='no-speech'){
+      // aborted = pttEnd의 정상 중단, no-speech = 말 중간 묵음
+      // 둘 다 onend가 이어서 처리하므로 여기선 아무것도 안 함
+      return;
+    }
     isRecording=false;
     if(btn)btn.classList.remove('recording');
     if(lbl)lbl.textContent='누르고 있는 동안 녹음';
     const msg={
-      'no-speech':'음성이 감지되지 않았어요. 마이크 가까이서 말해보세요.',
       'not-allowed':'마이크 권한이 필요해요. 브라우저 설정에서 허용해주세요.',
       'network':'네트워크 오류가 발생했어요. HTTPS 환경에서 사용해주세요.',
-      'aborted':'',  // 정상 중단 (PTT 손 뗌)
     }[e.error]??`오류: ${e.error}`;
-    if(msg&&res)res.textContent=`⚠️ ${msg}`;
+    if(res)res.textContent=`⚠️ ${msg}`;
   };
 
   recognition.onend=()=>{
-    if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
-    // 버튼 UI 정리
-    if(btn)btn.classList.remove('recording');
-    isRecording=false;
-
-    // transcript 확보 (화면에 표시된 텍스트도 fallback으로 활용)
-    const transcript=(
-      vFinalTranscript.trim() ||
-      (res&&res.classList.contains('has-text')?res.textContent.replace(/^🎙.*$/,'').trim():'')
-    ).trim();
-
-    if(!transcript){
-      // PTT로 손을 뗀 경우지만 transcript가 없으면 — 짧게 말했거나 no-speech
-      if(_pttReleased){
-        if(lbl)lbl.textContent='누르고 있는 동안 녹음';
-        if(res&&!res.classList.contains('has-text'))
-          res.textContent='⚠️ 음성이 너무 짧거나 감지되지 않았어요. 다시 눌러서 말해보세요.';
-      }
+    // 아직 손 안 뗀 상태 + 아직 recording 중 → 자동 재시작 (브라우저 강제 종료 대응)
+    if(!_pttReleased&&isRecording){
+      try{recognition.start();}catch(e){}
       return;
     }
 
+    // 손 뗀 후 → 채점
+    isRecording=false;
+    if(btn)btn.classList.remove('recording');
+
+    // vFinalTranscript 우선, 없으면 interim snapshot, 없으면 화면 텍스트
+    const transcript=(
+      vFinalTranscript.trim() ||
+      vInterimSnapshot.trim() ||
+      (res&&res.classList.contains('has-text')?res.textContent.trim():'')
+    ).replace(/^🎙.*/,'').trim();
+
     if(lbl)lbl.textContent='누르고 있는 동안 녹음';
+
+    if(!transcript){
+      if(res)res.textContent='⚠️ 음성이 감지되지 않았어요. 다시 눌러서 말해보세요.';
+      return;
+    }
+
     const elapsed=((Date.now()-vStartTime)/1000).toFixed(1);
     checkVoiceAnswer(si,transcript,elapsed);
   };
@@ -2054,6 +2068,18 @@ function nextVoice(){
 
 renderWordList();
 renderSentList();
+
+// 마지막 탭 복원 (학습 중이던 화면 유지)
+(function(){
+  try{
+    const lastTab=localStorage.getItem('vm-tab');
+    // 학습 진행 중인 탭들은 새로고침 시 learn으로 보냄 (상태 초기화 필요)
+    const safeRestore=['input','learn','toeic'];
+    if(lastTab&&document.getElementById('s-'+lastTab)){
+      go(safeRestore.includes(lastTab)?lastTab:'learn');
+    }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>

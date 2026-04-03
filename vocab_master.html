@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="theme-color" content="#0f0f13"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>VocabMaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#0f0f13;--bg2:#18181f;--bg3:#22222c;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.16);
+  --text:#f0f0f5;--text2:#9999b3;--text3:#55556a;
+  --green:#1eca8b;--green-bg:rgba(30,202,139,.12);
+  --amber:#f5a623;--amber-bg:rgba(245,166,35,.12);
+  --red:#f05a5a;--red-bg:rgba(240,90,90,.12);
+  --blue:#5b9df9;--blue-bg:rgba(91,157,249,.12);
+  --accent:#7c6af7;
+  --r:14px;--r-sm:10px;--sh:0 8px 32px rgba(0,0,0,.4);
+  --sat:env(safe-area-inset-top,0px);
+  --sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);
+  --sar:env(safe-area-inset-right,0px);
+}
+/* LIGHT MODE */
+body.light{
+  --bg:#f5f5f8;--bg2:#ffffff;--bg3:#eeeef3;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.14);
+  --text:#18181f;--text2:#555570;--text3:#aaaabc;
+  --green:#0e8c5e;--green-bg:rgba(14,140,94,.1);
+  --amber:#b87410;--amber-bg:rgba(184,116,16,.1);
+  --red:#c93a3a;--red-bg:rgba(201,58,58,.1);
+  --blue:#2563c8;--blue-bg:rgba(37,99,200,.1);
+  --accent:#6554e8;
+  --sh:0 4px 20px rgba(0,0,0,.1);
+}
+body.light .bottom-nav{background:rgba(255,255,255,.95);}
+body.light .modal{box-shadow:0 24px 64px rgba(0,0,0,.18);}
+
+html{font-size:16px;height:100%;}
+body{
+  font-family:'Nunito','Noto Sans KR',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100dvh;line-height:1.5;overflow-x:hidden;
+  transition:background .25s,color .25s;
+}
+
+/* LAYOUT */
+.page-wrap{
+  max-width:720px;margin:0 auto;
+  padding:0 clamp(.75rem,4vw,1.5rem) calc(5rem + var(--sab));
+  padding-left:calc(clamp(.75rem,4vw,1.5rem) + var(--sal));
+  padding-right:calc(clamp(.75rem,4vw,1.5rem) + var(--sar));
+}
+
+/* HEADER */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(1.1rem + var(--sat)) 0 .875rem;
+  border-bottom:1px solid var(--border);margin-bottom:1.1rem;gap:8px;
+}
+.logo{
+  font-size:clamp(1rem,5vw,1.35rem);font-weight:900;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent) 0%,var(--blue) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.logo-sub{font-size:.68rem;color:var(--text3);font-weight:600;display:block;-webkit-text-fill-color:var(--text3);}
+.header-right{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.header-badge{
+  font-size:.65rem;font-weight:800;background:var(--accent);
+  color:#fff;border-radius:6px;padding:3px 8px;letter-spacing:.04em;white-space:nowrap;
+}
+.btn-api{
+  font-size:.65rem;font-weight:800;border:1px solid var(--border2);border-radius:7px;
+  background:transparent;color:var(--text2);cursor:pointer;padding:5px 9px;
+  font-family:inherit;white-space:nowrap;transition:all .15s;min-height:32px;
+}
+.btn-api:hover{background:var(--bg3);}
+
+/* THEME TOGGLE */
+.btn-theme{
+  width:34px;height:34px;
+  border:1px solid var(--border2);border-radius:50%;
+  background:transparent;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s,transform .2s;flex-shrink:0;
+  position:relative;overflow:hidden;
+  color:#c8c8e8;/* 다크모드: 밝은 라벤더 — 배경과 충분한 대비 */
+}
+body.light .btn-theme{color:#4a4a6a;/* 라이트모드: 짙은 슬레이트 */}
+.btn-theme:hover{background:var(--bg3);transform:rotate(18deg);}
+.btn-theme svg{width:16px;height:16px;transition:opacity .25s,transform .3s;position:absolute;}
+.btn-theme .icon-sun{opacity:0;transform:scale(.5) rotate(-90deg);}
+.btn-theme .icon-moon{opacity:1;transform:scale(1) rotate(0deg);}
+body.light .btn-theme .icon-sun{opacity:1;transform:scale(1) rotate(0deg);}
+body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
+
+/* BOTTOM NAV (mobile default) */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(24,24,31,.95);
+  border-top:1px solid var(--border);
+  display:flex;padding-bottom:var(--sab);z-index:50;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+}
+.bnav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:10px 4px 8px;border:none;background:transparent;
+  color:var(--text3);cursor:pointer;font-family:inherit;transition:color .2s;
+}
+.bnav-btn.active{color:var(--accent);}
+.bnav-icon{font-size:1.2rem;line-height:1;}
+.bnav-label{font-size:.58rem;font-weight:800;letter-spacing:.03em;}
+
+/* TOP NAV (desktop ≥600px) */
+.top-nav{
+  display:none;gap:4px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:16px;
+  padding:5px;margin-bottom:1.1rem;
+}
+.tnav-btn{
+  flex:1;padding:9px 4px;font-size:.75rem;font-weight:800;
+  border:none;background:transparent;color:var(--text2);cursor:pointer;
+  border-radius:11px;transition:all .2s;font-family:inherit;
+}
+.tnav-btn.active{background:var(--bg3);color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.tnav-btn:hover:not(.active){color:var(--text);}
+
+@media(min-width:600px){
+  .bottom-nav{display:none;}
+  .top-nav{display:flex;}
+  .page-wrap{padding-bottom:2rem;}
+}
+
+/* SCREENS */
+.screen{display:none;animation:fadeIn .22s ease;}
+.screen.on{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1rem;margin-bottom:.75rem;}
+
+/* INPUT SECTION */
+.input-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:10px;}
+@media(max-width:440px){
+  .input-grid{grid-template-columns:1fr 1fr;grid-template-rows:auto auto;}
+  .input-grid .btn-add{grid-column:1/-1;}
+}
+.input-grid input{
+  padding:11px 12px;font-weight:600;background:var(--bg3);
+  border:1px solid var(--border);border-radius:var(--r-sm);
+  color:var(--text);outline:none;transition:border-color .2s;width:100%;
+  font-size:max(.875rem,16px);font-family:inherit;
+}
+.input-grid input::placeholder{color:var(--text3);}
+.input-grid input:focus{border-color:var(--accent);}
+
+/* BUTTONS */
+.btn{
+  padding:11px 18px;font-size:.82rem;font-weight:800;font-family:inherit;
+  border:1px solid var(--border2);border-radius:var(--r-sm);background:transparent;
+  color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap;min-height:44px;
+}
+.btn:hover{background:var(--bg3);}
+.btn:active{transform:scale(.97);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 4px 16px rgba(124,106,247,.35);}
+.btn.primary:hover{opacity:.88;}
+.btn.primary:disabled{opacity:.35;cursor:not-allowed;}
+.btn-wide{width:100%;padding:14px;font-size:.9rem;}
+
+/* WORD LIST */
+.wlist{
+  display:flex;flex-direction:column;gap:5px;
+  max-height:min(220px,35vh);overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.wlist::-webkit-scrollbar{width:3px;}
+.wlist::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.wi{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg3);border-radius:var(--r-sm);font-size:.8rem;}
+.wi .wd{font-weight:800;min-width:0;flex:0 1 auto;color:var(--text);word-break:break-word;}
+.wi .mn{color:var(--text2);flex:1;font-weight:600;word-break:break-word;min-width:0;}
+.wi .err-badge{flex-shrink:0;font-size:.65rem;font-weight:800;background:var(--red-bg);color:var(--red);border-radius:5px;padding:2px 7px;white-space:nowrap;}
+.wi .del-btn{
+  flex-shrink:0;background:none;border:none;color:var(--text3);cursor:pointer;
+  font-size:1.1rem;line-height:1;min-width:36px;min-height:36px;
+  display:flex;align-items:center;justify-content:center;
+  border-radius:6px;transition:color .15s,background .15s;
+}
+.wi .del-btn:hover{color:var(--red);background:var(--red-bg);}
+.empty-msg{text-align:center;padding:2rem;color:var(--text3);font-size:.82rem;font-weight:600;line-height:1.7;}
+
+/* STATS */
+.stats-row{display:flex;gap:6px;margin-bottom:.75rem;}
+.stat-chip{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 6px;text-align:center;}
+.stat-num{font-size:clamp(1rem,5vw,1.3rem);font-weight:900;}
+.stat-num.g{color:var(--green);}.stat-num.r{color:var(--red);}.stat-num.a{color:var(--amber);}
+.stat-label{font-size:.58rem;color:var(--text3);font-weight:700;margin-top:2px;text-transform:uppercase;letter-spacing:.04em;}
+
+/* REPEAT BANNER */
+.rq-banner{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:var(--red-bg);border:1px solid rgba(240,90,90,.22);
+  border-radius:var(--r-sm);margin-bottom:.75rem;
+}
+.rq-icon{font-size:1rem;}.rq-text{font-size:.73rem;font-weight:700;color:#f5a0a0;flex:1;}
+.rq-cnt{font-size:1.1rem;font-weight:900;color:var(--red);}
+
+/* MEMORY CARD */
+.mem-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:20px;
+  overflow:hidden;margin-bottom:.75rem;cursor:pointer;
+  transition:border-color .2s,transform .12s;box-shadow:var(--sh);
+}
+.mem-card:active{transform:scale(.995);}
+.mem-scene{width:100%;height:clamp(90px,22vw,140px);position:relative;overflow:hidden;}
+.mem-scene canvas{position:absolute;inset:0;width:100%;height:100%;}
+.mem-body{padding:clamp(.875rem,3vw,1.5rem);}
+.mem-word{font-size:clamp(1.4rem,6.5vw,2rem);font-weight:900;color:var(--text);margin-bottom:.2rem;letter-spacing:-.02em;transition:filter .3s;}
+.mem-meaning{font-size:clamp(.82rem,3.5vw,1rem);color:var(--text2);font-weight:700;margin-bottom:.875rem;}
+.mem-reveal{display:none;}.mem-reveal.on{display:block;}
+.ai-section{margin-bottom:.75rem;}
+.ai-label{display:inline-block;font-size:.6rem;font-weight:800;border-radius:5px;padding:2px 9px;margin-bottom:.35rem;letter-spacing:.05em;text-transform:uppercase;}
+.ai-label.mem-lbl{background:var(--blue-bg);color:var(--blue);}
+.ai-label.mem-lbl2{background:var(--amber-bg);color:var(--amber);}
+.ai-label.ex-lbl{background:var(--green-bg);color:var(--green);}
+.ai-label.repeat-lbl{background:var(--red-bg);color:var(--red);}
+.ai-text{font-size:.77rem;color:var(--text2);line-height:1.75;font-weight:600;}
+.ai-text em{color:var(--text);font-style:normal;font-weight:800;}
+.tap-hint{font-size:.7rem;color:var(--text3);text-align:center;padding:.5rem 0;font-weight:700;}
+
+/* FLASH BUTTONS */
+.fc-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.5rem;}
+.fc-btn{
+  padding:clamp(11px,3vw,14px);font-size:.85rem;font-weight:800;
+  font-family:inherit;border:none;border-radius:var(--r-sm);
+  cursor:pointer;transition:all .15s;min-height:48px;
+}
+.fc-btn:active{transform:scale(.97);}
+.fc-btn.know{background:var(--green-bg);color:var(--green);border:1px solid rgba(30,202,139,.25);}
+.fc-btn.know:hover{background:rgba(30,202,139,.2);}
+.fc-btn.dunno{background:var(--red-bg);color:var(--red);border:1px solid rgba(240,90,90,.25);}
+.fc-btn.dunno:hover{background:rgba(240,90,90,.2);}
+.ctr-line{text-align:center;font-size:.7rem;color:var(--text3);font-weight:700;padding:.25rem 0;}
+
+/* QUIZ */
+.qword-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);
+  padding:1.25rem;text-align:center;margin-bottom:.75rem;position:relative;box-shadow:var(--sh);
+}
+.qword{font-size:clamp(1.4rem,6vw,1.85rem);font-weight:900;color:var(--text);letter-spacing:-.02em;}
+.qsub{font-size:.7rem;color:var(--text3);margin-top:5px;font-weight:700;}
+.repeat-tag{position:absolute;top:10px;right:12px;font-size:.6rem;font-weight:800;background:var(--red-bg);color:var(--red);border-radius:5px;padding:3px 8px;}
+.qopts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:.75rem;}
+@media(max-width:380px){.qopts{grid-template-columns:1fr;}}
+.qopt{
+  padding:14px 12px;font-size:.82rem;font-weight:700;font-family:inherit;
+  border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg2);
+  color:var(--text2);cursor:pointer;text-align:left;line-height:1.4;
+  transition:all .15s;min-height:48px;
+}
+.qopt:hover:not(:disabled){background:var(--bg3);color:var(--text);border-color:var(--border2);}
+.qopt.correct{background:var(--green-bg);border-color:rgba(30,202,139,.4);color:var(--green);}
+.qopt.wrong{background:var(--red-bg);border-color:rgba(240,90,90,.4);color:var(--red);}
+.qopt:disabled{cursor:default;}
+.feedback-box{border-radius:var(--r-sm);padding:1rem 1.125rem;margin-bottom:.75rem;display:none;}
+.feedback-box.ok{background:var(--green-bg);border:1px solid rgba(30,202,139,.22);}
+.feedback-box.ng{background:var(--red-bg);border:1px solid rgba(240,90,90,.22);}
+.fb-top{font-size:.85rem;font-weight:800;margin-bottom:.75rem;}
+.fb-top.ok{color:var(--green);}.fb-top.ng{color:var(--red);}
+.fb-scene{width:100%;height:80px;border-radius:8px;overflow:hidden;margin-bottom:.5rem;position:relative;background:var(--bg3);}
+.fb-scene canvas{position:absolute;inset:0;width:100%;height:100%;}
+
+/* TYPING */
+.tword-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;text-align:center;margin-bottom:.75rem;position:relative;box-shadow:var(--sh);}
+.tmeaning{font-size:clamp(1rem,5vw,1.5rem);font-weight:800;color:var(--text);}
+.hint-boxes{display:flex;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:.75rem;}
+.hbox{
+  width:clamp(20px,5.5vw,28px);height:clamp(28px,7vw,36px);
+  border:2px solid var(--border2);border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(.7rem,3.2vw,.9rem);font-weight:800;
+  background:var(--bg3);color:var(--text);transition:all .15s;
+}
+.hbox.ok2{background:var(--green-bg);border-color:rgba(30,202,139,.5);color:var(--green);}
+.hbox.ng2{background:var(--red-bg);border-color:rgba(240,90,90,.5);color:var(--red);}
+.hbox.cur{border-color:var(--accent);background:rgba(124,106,247,.12);}
+.tinput-row{display:flex;gap:8px;margin-bottom:.75rem;}
+.tinput{
+  flex:1;padding:12px 14px;font-size:max(1rem,16px);font-weight:800;
+  font-family:'Nunito',sans-serif;border:1px solid var(--border);
+  border-radius:var(--r-sm);background:var(--bg3);color:var(--text);
+  outline:none;letter-spacing:.03em;transition:border-color .2s;min-height:48px;
+}
+.tinput:focus{border-color:var(--accent);}
+.tinput.tok{border-color:var(--green);background:var(--green-bg);}
+.tinput.tng{border-color:var(--red);background:var(--red-bg);}
+
+/* AI LOADING */
+.ai-loading{display:flex;align-items:center;justify-content:center;gap:8px;font-size:.73rem;color:var(--text3);padding:.5rem;font-weight:700;}
+.ai-loading::after{content:'';display:block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* COMPLETE */
+.complete-box{text-align:center;padding:clamp(2rem,8vw,3rem) 1rem;}
+.complete-emoji{font-size:clamp(2.5rem,12vw,3.5rem);margin-bottom:.75rem;display:block;}
+.complete-title{font-size:clamp(1.1rem,5vw,1.4rem);font-weight:900;margin-bottom:.35rem;}
+.complete-sub{font-size:.82rem;color:var(--text2);font-weight:600;margin-bottom:1.5rem;}
+
+/* ANIMATIONS */
+@keyframes pop{0%,100%{transform:scale(1);}50%{transform:scale(1.04);}}
+.pop{animation:pop .25s ease;}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+.shake{animation:shake .3s ease;}
+
+/* MODAL */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  display:flex;align-items:center;justify-content:center;
+  z-index:100;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);padding:1rem;
+}
+.modal{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:20px;
+  padding:clamp(1.25rem,5vw,2rem);width:100%;max-width:440px;
+  box-shadow:0 24px 64px rgba(0,0,0,.6);
+}
+.modal h2{font-size:clamp(1rem,4.5vw,1.2rem);font-weight:900;margin-bottom:.5rem;}
+.modal p{font-size:.77rem;color:var(--text2);font-weight:600;margin-bottom:1.25rem;line-height:1.65;}
+.modal p a{color:var(--blue);}
+.modal input{
+  width:100%;padding:12px 14px;font-size:max(.85rem,16px);font-family:inherit;
+  background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r-sm);
+  color:var(--text);outline:none;margin-bottom:.75rem;font-weight:600;
+  letter-spacing:.04em;min-height:48px;
+}
+.modal input:focus{border-color:var(--accent);}
+.modal-note{font-size:.65rem;color:var(--text3);margin-top:.75rem;text-align:center;font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>🔑 Anthropic API 키 입력</h2>
+    <p>AI 연상법·예문 기능을 사용하려면 API 키가 필요해요.<br>
+    <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받을 수 있어요.<br>
+    키는 이 브라우저 세션에만 저장돼요.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off"/>
+    <button class="btn primary btn-wide" onclick="saveApiKey()">저장하고 시작하기</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-wide" onclick="skipApiKey()">AI 없이 시작하기</button>
+    <div class="modal-note">⚠️ API 키는 외부로 전송되지 않아요</div>
+  </div>
+</div>
+
+<div class="page-wrap">
+  <header>
+    <div>
+      <div class="logo">VocabMaster</div>
+      <span class="logo-sub">영어 단어 학습 · by Claude AI</span>
+    </div>
+    <div class="header-right">
+      <button class="btn-theme" onclick="toggleTheme()" id="themeBtn" aria-label="테마 전환">
+        <!-- sun icon -->
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4.5"/>
+          <line x1="12" y1="2" x2="12" y2="5"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/>
+          <line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/>
+          <line x1="2" y1="12" x2="5" y2="12"/>
+          <line x1="19" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/>
+          <line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/>
+        </svg>
+        <!-- moon icon -->
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+      <button class="btn-api" onclick="showApiModal()">🔑 API 키</button>
+      <span class="header-badge" id="apiStatus">AI OFF</span>
+    </div>
+  </header>
+
+  <!-- TOP NAV (desktop) -->
+  <nav class="top-nav">
+    <button class="tnav-btn active" onclick="go('input')">📝 단어입력</button>
+    <button class="tnav-btn" onclick="go('flash')">🃏 플래시카드</button>
+    <button class="tnav-btn" onclick="go('quiz')">❓ 퀴즈</button>
+    <button class="tnav-btn" onclick="go('type')">⌨️ 받아쓰기</button>
+  </nav>
+
+  <!-- INPUT -->
+  <div class="screen on" id="s-input">
+    <div class="card">
+      <div class="input-grid">
+        <input id="wi" placeholder="영어 단어" autocomplete="off" autocorrect="off" spellcheck="false"/>
+        <input id="mi" placeholder="뜻 (한국어)" autocomplete="off"/>
+        <button class="btn btn-add" onclick="addWord()">추가</button>
+      </div>
+      <div class="wlist" id="wlist"></div>
+    </div>
+    <button class="btn primary btn-wide" id="startBtn" disabled onclick="go('flash')">학습 시작하기 →</button>
+  </div>
+
+  <!-- FLASH -->
+  <div class="screen" id="s-flash">
+    <div class="stats-row">
+      <div class="stat-chip"><div class="stat-num g" id="f-know">0</div><div class="stat-label">알아요</div></div>
+      <div class="stat-chip"><div class="stat-num r" id="f-dunno">0</div><div class="stat-label">모르겠어요</div></div>
+      <div class="stat-chip"><div class="stat-num a" id="f-repeat">0</div><div class="stat-label">복습 대기</div></div>
+    </div>
+    <div id="f-rq-banner"></div>
+    <div id="flash-body"></div>
+  </div>
+
+  <!-- QUIZ -->
+  <div class="screen" id="s-quiz">
+    <div class="stats-row">
+      <div class="stat-chip"><div class="stat-num g" id="q-ok">0</div><div class="stat-label">정답</div></div>
+      <div class="stat-chip"><div class="stat-num r" id="q-ng">0</div><div class="stat-label">오답</div></div>
+      <div class="stat-chip"><div class="stat-num a" id="q-repeat">0</div><div class="stat-label">복습 대기</div></div>
+    </div>
+    <div id="q-rq-banner"></div>
+    <div id="quiz-body"></div>
+  </div>
+
+  <!-- TYPE -->
+  <div class="screen" id="s-type">
+    <div class="stats-row">
+      <div class="stat-chip"><div class="stat-num g" id="t-ok">0</div><div class="stat-label">정답</div></div>
+      <div class="stat-chip"><div class="stat-num r" id="t-ng">0</div><div class="stat-label">오답</div></div>
+      <div class="stat-chip"><div class="stat-num a" id="t-repeat">0</div><div class="stat-label">복습 대기</div></div>
+    </div>
+    <div id="t-rq-banner"></div>
+    <div id="type-body"></div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV (mobile) -->
+<nav class="bottom-nav">
+  <button class="bnav-btn active" onclick="go('input')">
+    <span class="bnav-icon">📝</span><span class="bnav-label">단어입력</span>
+  </button>
+  <button class="bnav-btn" onclick="go('flash')">
+    <span class="bnav-icon">🃏</span><span class="bnav-label">플래시카드</span>
+  </button>
+  <button class="bnav-btn" onclick="go('quiz')">
+    <span class="bnav-icon">❓</span><span class="bnav-label">퀴즈</span>
+  </button>
+  <button class="bnav-btn" onclick="go('type')">
+    <span class="bnav-icon">⌨️</span><span class="bnav-label">받아쓰기</span>
+  </button>
+</nav>
+
+<script>
+let API_KEY='';
+let aiCache={};
+
+/* THEME */
+function toggleTheme(){
+  document.body.classList.toggle('light');
+  const isLight=document.body.classList.contains('light');
+  localStorage.setItem('vm-theme',isLight?'light':'dark');
+  document.querySelector('meta[name="theme-color"]').setAttribute('content',isLight?'#f5f5f8':'#0f0f13');
+}
+(function(){
+  const saved=localStorage.getItem('vm-theme');
+  if(saved==='light'){
+    document.body.classList.add('light');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content','#f5f5f8');
+  }
+})();
+
+function saveApiKey(){
+  const k=document.getElementById('apiKeyInput').value.trim();
+  if(!k)return;
+  API_KEY=k;
+  document.getElementById('apiModal').style.display='none';
+  const b=document.getElementById('apiStatus');
+  b.textContent='AI ON';b.style.background='#1eca8b';
+}
+function skipApiKey(){document.getElementById('apiModal').style.display='none';}
+function showApiModal(){document.getElementById('apiModal').style.display='flex';}
+
+let words=[
+  {word:'apple',meaning:'사과'},
+  {word:'beautiful',meaning:'아름다운'},
+  {word:'challenge',meaning:'도전'},
+  {word:'diligent',meaning:'부지런한'},
+  {word:'encourage',meaning:'격려하다'},
+];
+let errCount={};
+
+const PALETTES=[
+  ['#1a2a4a','#0d1f3c','#5b9df9'],
+  ['#0d2e22','#0a2019','#1eca8b'],
+  ['#2e1f0a','#231600','#f5a623'],
+  ['#2a0d22','#1f0a18','#e86daa'],
+  ['#1a0d3a','#130929','#9b7cf8'],
+  ['#0d2a1a','#091f12','#4ec98a'],
+];
+function palette(i){return PALETTES[i%PALETTES.length];}
+
+function drawScene(canvas,word,meaning,pal){
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width=canvas.offsetWidth||340;
+  const H=canvas.height=canvas.offsetHeight||120;
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,W,H);
+  g.addColorStop(0,pal[0]);g.addColorStop(1,pal[1]);
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const seed=word.charCodeAt(0)*31+word.length;
+  for(let i=0;i<7;i++){
+    const x=((seed*(i+1)*137)%W);
+    const y=((seed*(i+2)*79)%H);
+    const r=20+((seed*(i+3)*53)%45);
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=pal[2]+(i%2===0?'20':'10');ctx.fill();
+  }
+  ctx.font=`900 ${Math.min(W,H)*.55}px Nunito,sans-serif`;
+  ctx.fillStyle=pal[2]+'18';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(word[0].toUpperCase(),W*.8,H*.5);
+}
+
+function renderWordList(){
+  const el=document.getElementById('wlist');
+  document.getElementById('startBtn').disabled=words.length===0;
+  if(!words.length){
+    el.innerHTML='<div class="empty-msg">단어를 추가하면<br>AI가 이미지 연상법을 만들어줘요 ✨</div>';
+    return;
+  }
+  el.innerHTML=words.map((w,i)=>{
+    const ec=errCount[i]||0;
+    return `<div class="wi">
+      <span class="wd">${w.word}</span>
+      <span class="mn">${w.meaning}</span>
+      ${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}
+      <button class="del-btn" onclick="delWord(${i})" aria-label="삭제">×</button>
+    </div>`;
+  }).join('');
+}
+function addWord(){
+  const wi=document.getElementById('wi'),mi=document.getElementById('mi');
+  const w=wi.value.trim(),m=mi.value.trim();
+  if(!w||!m)return;
+  words.push({word:w,meaning:m});
+  wi.value='';mi.value='';
+  renderWordList();wi.focus();
+}
+function delWord(i){words.splice(i,1);delete errCount[i];renderWordList();}
+document.getElementById('mi').addEventListener('keydown',e=>{if(e.key==='Enter')addWord();});
+document.getElementById('wi').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mi').focus();});
+
+async function getAI(word,meaning){
+  if(aiCache[word])return aiCache[word];
+  if(!API_KEY)return{scene:'',memory:'',sentence:''};
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':API_KEY,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:400,
+        messages:[{role:'user',content:`영어 단어 "${word}" (뜻: ${meaning})에 대해 JSON만 응답 (마크다운 없이):
+{"scene":"이 단어 뜻을 시각적으로 떠올릴 수 있는 생생한 장면 1-2문장","memory":"한국인이 발음/모양으로 쉽게 기억할 재미있는 연상법 1문장","sentence":"단어가 들어간 짧은 예문과 해석 (형식: 영문 | 한국어)"}`}]
+      })
+    });
+    const d=await res.json();
+    const txt=d.content?.find(c=>c.type==='text')?.text||'{}';
+    const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    aiCache[word]=parsed;return parsed;
+  }catch(e){return{scene:'',memory:'',sentence:''};}
+}
+
+function buildQueue(base){
+  const q=[...base];
+  base.forEach(i=>{const ec=errCount[i]||0;for(let r=0;r<Math.min(ec,3);r++)q.push(i);});
+  for(let i=q.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[q[i],q[j]]=[q[j],q[i]];}
+  return q;
+}
+function repeatCount(){return Object.values(errCount).filter(v=>v>0).length;}
+function repeatBanner(cid,sid){
+  const rc=repeatCount();
+  document.getElementById(sid).textContent=rc;
+  const el=document.getElementById(cid);
+  if(rc>0)el.innerHTML=`<div class="rq-banner"><span class="rq-icon">🔁</span><span class="rq-text">틀린 단어 <strong>${rc}개</strong>가 반복 출제돼요</span><span class="rq-cnt">${rc}</span></div>`;
+  else el.innerHTML='';
+}
+
+const TABS=['input','flash','quiz','type'];
+function go(tab){
+  TABS.forEach((t,i)=>{
+    const tn=document.querySelectorAll('.tnav-btn')[i];if(tn)tn.classList.toggle('active',t===tab);
+    const bn=document.querySelectorAll('.bnav-btn')[i];if(bn)bn.classList.toggle('active',t===tab);
+  });
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+tab).classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(tab==='flash')initFlash();
+  if(tab==='quiz')initQuiz();
+  if(tab==='type')initType();
+}
+
+/* FLASH */
+let fQueue=[],fIdx=0,fKnow=0,fDunno=0,fFlipped=false;
+function initFlash(){
+  if(!words.length){document.getElementById('flash-body').innerHTML='<div class="empty-msg" style="padding:3rem">단어를 먼저 입력해주세요</div>';return;}
+  fQueue=buildQueue([...Array(words.length).keys()]);
+  fIdx=0;fKnow=0;fDunno=0;
+  repeatBanner('f-rq-banner','f-repeat');updateFStats();showFlash();
+}
+function updateFStats(){
+  document.getElementById('f-know').textContent=fKnow;
+  document.getElementById('f-dunno').textContent=fDunno;
+}
+function showFlash(){
+  if(fIdx>=fQueue.length){
+    const pct=Math.round((fKnow/(fKnow+fDunno||1))*100);
+    document.getElementById('flash-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">플래시카드 완료!</div>
+      <div class="complete-sub">알아요 ${fKnow}개 · 모르겠어요 ${fDunno}개</div>
+      <button class="btn primary" onclick="initFlash()">다시 학습</button>
+    </div>`;return;
+  }
+  const wi=fQueue[fIdx],w=words[wi],pal=palette(wi),isRepeat=(errCount[wi]||0)>0;
+  fFlipped=false;
+  document.getElementById('flash-body').innerHTML=`
+    <div class="mem-card" id="fcard" onclick="flipFlash(${wi})">
+      <div class="mem-scene"><canvas id="fcanvas"></canvas></div>
+      <div class="mem-body">
+        ${isRepeat?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}
+        <div class="mem-word" id="fword" style="filter:blur(6px)">${w.word}</div>
+        <div class="mem-meaning">${w.meaning}</div>
+        <div class="mem-reveal" id="freveal">
+          <div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div>
+        </div>
+        <div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div>
+      </div>
+    </div>
+    <div class="fc-btns">
+      <button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button>
+      <button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button>
+    </div>
+    <div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
+  setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);
+  getAI(w.word,w.meaning);
+}
+async function flipFlash(wi){
+  if(fFlipped)return;fFlipped=true;
+  const w=words[wi];
+  document.getElementById('fword').style.filter='none';
+  document.getElementById('freveal').classList.add('on');
+  document.getElementById('ftap').style.display='none';
+  const ai=await getAI(w.word,w.meaning);
+  const el=document.getElementById('fai-content');if(!el)return;
+  let html='';
+  if(ai.scene)html+=`<div class="ai-section"><div class="ai-label mem-lbl">🖼 이미지 연상</div><div class="ai-text">${ai.scene}</div></div>`;
+  if(ai.memory)html+=`<div class="ai-section"><div class="ai-label mem-lbl2">💡 기억법</div><div class="ai-text">${ai.memory}</div></div>`;
+  if(ai.sentence){const p=ai.sentence.split('|');html+=`<div class="ai-section"><div class="ai-label ex-lbl">📖 예문</div><div class="ai-text"><em>${p[0]?.trim()||''}</em>${p[1]?'<br>'+p[1].trim():''}</div></div>`;}
+  el.innerHTML=html||'<div style="font-size:.73rem;color:var(--text3);text-align:center;padding:.5rem">API 키를 설정하면 AI 연상법이 표시돼요</div>';
+}
+function markFlash(wi,know){
+  if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
+  else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}
+  fIdx++;
+  const fc=document.getElementById('fcard');
+  if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}
+  updateFStats();repeatBanner('f-rq-banner','f-repeat');renderWordList();showFlash();
+}
+
+/* QUIZ */
+let qQueue=[],qIdx=0,qOk=0,qNg=0,qAnswered=false;
+function initQuiz(){
+  if(words.length<2){document.getElementById('quiz-body').innerHTML='<div class="empty-msg" style="padding:3rem">퀴즈는 단어 2개 이상 필요해요</div>';return;}
+  qQueue=buildQueue([...Array(words.length).keys()]);
+  qIdx=0;qOk=0;qNg=0;qAnswered=false;
+  repeatBanner('q-rq-banner','q-repeat');updateQStats();showQuiz();
+}
+function updateQStats(){
+  document.getElementById('q-ok').textContent=qOk;
+  document.getElementById('q-ng').textContent=qNg;
+}
+function showQuiz(){
+  if(qIdx>=qQueue.length){
+    const pct=Math.round((qOk/(qOk+qNg||1))*100);
+    document.getElementById('quiz-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">퀴즈 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${qOk} · 오답 ${qNg}</div>
+      <button class="btn primary" onclick="initQuiz()">다시 풀기</button>
+    </div>`;return;
+  }
+  const wi=qQueue[qIdx],correct=words[wi],isRepeat=(errCount[wi]||0)>0;
+  const others=words.filter((_,i)=>i!==wi).sort(()=>Math.random()-.5).slice(0,3);
+  const opts=[...others,correct].sort(()=>Math.random()-.5);
+  qAnswered=false;
+  document.getElementById('quiz-body').innerHTML=`
+    <div class="qword-card">
+      ${isRepeat?'<div class="repeat-tag">🔁 복습</div>':''}
+      <div class="qword">${correct.word}</div>
+      <div class="qsub">알맞은 뜻을 고르세요</div>
+    </div>
+    <div class="qopts">${opts.map(o=>`<button class="qopt" data-meaning="${o.meaning.replace(/"/g,'&quot;')}" onclick="answerQuiz(this,'${o.meaning.replace(/'/g,"\\'")}','${correct.meaning.replace(/'/g,"\\'")}',${wi})">${o.meaning}</button>`).join('')}</div>
+    <div class="feedback-box" id="qfb"></div>
+    <button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 →</button>`;
+}
+async function answerQuiz(btn,chosen,correct,wi){
+  if(qAnswered)return;qAnswered=true;
+  document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});
+  const ok=chosen===correct;
+  if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
+  else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;}
+  updateQStats();repeatBanner('q-rq-banner','q-repeat');renderWordList();
+  const fb=document.getElementById('qfb');
+  fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
+  const w=words[wi],pal=palette(wi);
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${correct}`}</div>
+    <div class="fb-scene"><canvas id="qfbcanvas"></canvas></div>
+    <div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
+  const ai=await getAI(w.word,w.meaning);
+  const el=document.getElementById('qfbai');if(!el)return;
+  let html='';
+  if(ai.scene)html+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;
+  if(ai.memory)html+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;
+  el.innerHTML=html||'';
+  document.getElementById('qnext').style.display='block';
+}
+function nextQuiz(){qIdx++;showQuiz();}
+
+/* TYPING */
+let tQueue=[],tIdx=0,tOk=0,tNg=0;
+function initType(){
+  if(!words.length){document.getElementById('type-body').innerHTML='<div class="empty-msg" style="padding:3rem">단어를 먼저 입력해주세요</div>';return;}
+  tQueue=buildQueue([...Array(words.length).keys()]);
+  tIdx=0;tOk=0;tNg=0;
+  repeatBanner('t-rq-banner','t-repeat');updateTStats();showType();
+}
+function updateTStats(){
+  document.getElementById('t-ok').textContent=tOk;
+  document.getElementById('t-ng').textContent=tNg;
+}
+function showType(){
+  if(tIdx>=tQueue.length){
+    const pct=Math.round((tOk/(tOk+tNg||1))*100);
+    document.getElementById('type-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'✨':pct>=50?'📝':'💪'}</span>
+      <div class="complete-title">받아쓰기 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${tOk} · 오답 ${tNg}</div>
+      <button class="btn primary" onclick="initType()">다시 풀기</button>
+    </div>`;return;
+  }
+  const wi=tQueue[tIdx],w=words[wi],isRepeat=(errCount[wi]||0)>0;
+  document.getElementById('type-body').innerHTML=`
+    <div class="tword-card" id="tcard">
+      ${isRepeat?'<div class="repeat-tag">🔁 복습</div>':''}
+      <div class="tmeaning">${w.meaning}</div>
+      <div class="hint-boxes" id="hboxes">
+        ${w.word.split('').map((ch,i)=>`<div class="hbox${i===0?' ok2':''}" id="hb${i}">${i===0?ch.toUpperCase():' '}</div>`).join('')}
+      </div>
+    </div>
+    <div class="tinput-row">
+      <input class="tinput" id="tinput" type="text" placeholder="영어로 입력..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <button class="btn" id="tcheckbtn" onclick="checkType(${wi})">확인</button>
+    </div>
+    <div class="feedback-box" id="tfb"></div>
+    <div id="tai-out"></div>
+    <button class="btn btn-wide" id="tnext" style="display:none;margin-top:.25rem" onclick="nextType()">다음 →</button>`;
+  const inp=document.getElementById('tinput');
+  inp.focus();
+  const target=w.word.toLowerCase();
+  inp.addEventListener('input',()=>{
+    const val=inp.value.toLowerCase();
+    w.word.split('').forEach((_,i)=>{
+      const hb=document.getElementById('hb'+i);if(!hb)return;
+      if(i===0){hb.textContent=w.word[0].toUpperCase();hb.className='hbox ok2';return;}
+      if(i<val.length){hb.textContent=inp.value[i]||'';hb.className='hbox '+(val[i]===target[i]?'ok2':'ng2');}
+      else if(i===val.length){hb.textContent=' ';hb.className='hbox cur';}
+      else{hb.textContent=' ';hb.className='hbox';}
+    });
+  });
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkType(wi);});
+}
+async function checkType(wi){
+  const inp=document.getElementById('tinput');
+  const val=inp.value.trim();if(!val)return;
+  inp.disabled=true;
+  const tchk=document.getElementById('tcheckbtn');if(tchk)tchk.disabled=true;
+  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();
+  inp.classList.add(ok?'tok':'tng');
+  w.word.split('').forEach((ch,i)=>{const hb=document.getElementById('hb'+i);if(hb){hb.textContent=ch;hb.className='hbox '+(ok?'ok2':'ng2');}});
+  if(ok){tOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
+  else{tNg++;errCount[wi]=(errCount[wi]||0)+1;const tc=document.getElementById('tcard');if(tc){tc.classList.add('shake');setTimeout(()=>tc.classList.remove('shake'),300);}}
+  updateTStats();repeatBanner('t-rq-banner','t-repeat');renderWordList();
+  const fb=document.getElementById('tfb');
+  fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
+  const pal=palette(wi);
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${w.word}`}</div>
+    <div class="fb-scene"><canvas id="tfbcanvas"></canvas></div>
+    <div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
+  const ai=await getAI(w.word,w.meaning);
+  const el=document.getElementById('tfbai');if(!el)return;
+  let html='';
+  if(ai.scene)html+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;
+  if(ai.memory)html+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;
+  el.innerHTML=html||'';
+  document.getElementById('tnext').style.display='block';
+}
+function nextType(){tIdx++;showType();}
+
+renderWordList();
+</script>
+</body>
+</html>

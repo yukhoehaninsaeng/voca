@@ -423,7 +423,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   <header>
     <div>
       <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노의 단어 학습 </span>
+      <span class="logo-sub">🦖티라노의 단어 학습</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -1342,7 +1342,18 @@ async function checkType(wi){const inp=document.getElementById('tinput');const v
 function nextType(){tIdx++;showType();}
 
 /* ─── SENT HELPERS ───────────────────────────────────── */
-function pickBlank(en){const ws=en.replace(/[.,!?'"]/g,'').split(/\s+/);const c=ws.filter(w=>w.length>=4);return c.length?c[Math.floor(Math.random()*c.length)]:ws[ws.length-1];}
+function pickBlank(en){
+  // 구두점 제거 후 단어 배열
+  const ws=en.replace(/[.,!?'"]/g,'').split(/\s+/).filter(w=>w.length>0);
+  // 우선순위: 4글자 이상 → 3글자 이상 → 2글자 이상 → 그냥 아무거나
+  const pick=(minLen)=>ws.filter(w=>w.length>=minLen);
+  const cands=pick(4).length?pick(4):pick(3).length?pick(3):pick(2).length?pick(2):ws;
+  // 관사(a/an/the), be동사(is/are/was) 제외
+  const skip=new Set(['a','an','the','is','are','was','were','be','i','at','on','in','of','to','by','do']);
+  const filtered=cands.filter(w=>!skip.has(w.toLowerCase()));
+  const pool=filtered.length?filtered:cands;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
 function normalize(s){return s.toLowerCase().replace(/[.,!?'"]/g,'').replace(/\s+/g,' ').trim();}
 function wordDiff(input,correct){const iW=input.split(/\s+/);const cW=correct.replace(/[.,!?'"]/g,'').split(/\s+/);return iW.map((w,i)=>{const c=w.replace(/[.,!?'"]/g,'').toLowerCase();const cc=(cW[i]||'').toLowerCase();return c===cc?`<span class="diff-ok">${w}</span>`:`<span class="diff-ng">${w}</span>`;}).join(' ');}
 
@@ -1359,8 +1370,26 @@ function showSent(){
 }
 function showSentBlank(si,s,isR,bodyId,prefix){
   const blank=pickBlank(s.en);
-  const safe=blank.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  const disp=s.en.replace(new RegExp(`\\b${safe}\\b`),'<span class="blank-word">_____</span>');
+  // \b 대신 단어 단위로 직접 split→join으로 첫 번째 일치 치환 (대소문자 무시)
+  const words=s.en.split(/(\s+)/); // 공백 포함 split
+  let replaced=false;
+  const dispParts=words.map(part=>{
+    if(!replaced&&part.replace(/[.,!?'"]/g,'').toLowerCase()===blank.toLowerCase()){
+      replaced=true;
+      return '<span class="blank-word">_____</span>';
+    }
+    return part;
+  });
+  // 혹시 매칭 실패 시 마지막 단어 강제 치환
+  if(!replaced){
+    const nonSpace=dispParts.filter(p=>!/^\s+$/.test(p));
+    if(nonSpace.length){
+      const last=nonSpace[nonSpace.length-1];
+      const lastIdx=dispParts.lastIndexOf(last);
+      dispParts[lastIdx]='<span class="blank-word">_____</span>';
+    }
+  }
+  const disp=dispParts.join('');
   document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">빈칸 채우기</div><div class="sent-ko-display">${s.ko}</div><div class="blank-sentence">${disp}</div></div><div class="blank-input-wrap"><input class="blank-input" id="${prefix}binp" type="text" placeholder="빈칸에 들어갈 단어" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-blank="${blank.replace(/"/g,'&quot;')}" data-si="${si}" data-prefix="${prefix}"/><button class="btn" onclick="checkBlank('${prefix}')">확인</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 →</button>`;
   const inp=document.getElementById(prefix+'binp');inp.focus();inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkBlank(prefix);});
 }

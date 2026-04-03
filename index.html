@@ -424,11 +424,24 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   </div>
 </div>
 
+<!-- OpenAI Whisper 키 모달 -->
+<div class="modal-overlay" id="openaiModal" style="display:none">
+  <div class="modal">
+    <h2>🎤 OpenAI API 키 입력</h2>
+    <p>음성 인식(Whisper)을 사용하면 인식률이 크게 향상돼요.<br><a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>에서 발급받을 수 있어요.<br>키는 localStorage에만 저장되고 외부로 전송되지 않아요.</p>
+    <input type="password" id="openaiKeyInput" placeholder="sk-..." autocomplete="off"/>
+    <button class="btn primary btn-wide" onclick="saveOpenAIKey()" style="background:var(--green);border-color:var(--green)">Whisper 활성화</button>
+    <div style="height:8px"></div>
+    <button class="btn btn-wide" onclick="document.getElementById('openaiModal').style.display='none'">나중에 설정하기</button>
+    <div class="modal-note">💡 키 없이도 Web Speech API(브라우저 기본)로 작동해요</div>
+  </div>
+</div>
+
 <div class="page-wrap">
   <header>
     <div>
       <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노 단어 학습</span>
+      <span class="logo-sub">영어 단어 학습 · by Claude AI</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -436,6 +449,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
       <button class="btn-api" onclick="showApiModal()">🔑 API 키</button>
+      <button class="btn-api" onclick="document.getElementById('openaiModal').style.display='flex'" style="background:rgba(30,202,139,.12);border-color:rgba(30,202,139,.3);color:var(--green)" id="whisperBtn">🎤 Whisper</button>
       <span class="header-badge" id="apiStatus">AI OFF</span>
     </div>
   </header>
@@ -1781,7 +1795,18 @@ function renderVoiceCard(s,si){
     <div class="voice-card">
       <div class="voice-progress">${vIdx+1} / ${vQueue.length} 번째 문장</div>
       <div class="voice-ko">${s.ko}</div>
-      <div style="font-size:.7rem;color:var(--text3);font-weight:700;margin-bottom:1rem">위 한국어를 영어로 말해보세요</div>
+      <div style="font-size:.7rem;color:var(--text3);font-weight:700;margin-bottom:.5rem">위 한국어를 영어로 말해보세요</div>
+
+      <!-- 힌트: 정답 문장 보기/가리기 -->
+      <div style="margin-bottom:1rem">
+        <button class="shadow-btn" id="hintBtn" onclick="toggleHint()" style="font-size:.72rem;padding:6px 14px;">
+          💡 정답 힌트 보기
+        </button>
+        <div id="hintBox" style="display:none;margin-top:.5rem;padding:.625rem .875rem;background:var(--amber-bg);border:1px solid rgba(245,166,35,.25);border-radius:var(--r-sm);font-size:.82rem;font-weight:700;color:var(--amber);line-height:1.6;word-break:break-word;">
+          ${s.en}
+        </div>
+      </div>
+
       <div class="mic-wrap">
         <button class="mic-btn" id="micBtn"
           onpointerdown="pttStart(${si})" onpointerup="pttEnd(${si})" onpointercancel="pttEnd(${si})"
@@ -1802,6 +1827,15 @@ function renderVoiceCard(s,si){
     </div>
     <div class="retry-count" id="retryCnt"></div>
   `;
+}
+
+function toggleHint(){
+  const box=document.getElementById('hintBox');
+  const btn=document.getElementById('hintBtn');
+  if(!box||!btn)return;
+  const showing=box.style.display!=='none';
+  box.style.display=showing?'none':'block';
+  btn.textContent=showing?'💡 정답 힌트 보기':'🙈 힌트 가리기';
 }
 
 /* 섀도잉 — TTS로 먼저 들려주기 */
@@ -1975,7 +2009,6 @@ async function checkVoiceAnswer(si,userAnswer,elapsed){
   fb.className='voice-feedback';
   fb.innerHTML=`<div class="ai-loading">AI 채점 중</div>`;
 
-  // AI 채점
   let result={correct:false,reason:'채점 실패'};
   if(API_KEY){
     try{
@@ -1985,34 +2018,46 @@ async function checkVoiceAnswer(si,userAnswer,elapsed){
         body:JSON.stringify({
           model:'claude-haiku-4-5-20251001',
           max_tokens:150,
-          messages:[{role:'user',content:`You are a strict answer checker.
-Question: ${s.ko}
-Correct Answer: ${s.en}
-User Answer: ${userAnswer}
-Task: Check if the answer is correct. Accept minor variations (articles, minor word order). Focus only on incorrect parts.
-Rules: Max 30 words. Do not repeat the full correct answer.
-Output JSON only: {"correct":true/false,"reason":"..."}`}]
+          messages:[{role:'user',content:`You are a lenient English speaking coach scoring a Korean learner.
+Correct sentence: "${s.en}"
+Student said: "${userAnswer}"
+
+Grading rules (be generous — this is speech-to-text, not writing):
+- CORRECT if the student conveyed the right meaning with mostly right words
+- CORRECT if only articles (a/an/the) differ
+- CORRECT if minor STT errors like "carring"→"carrying", "indor"→"indoors"
+- CORRECT if word order is slightly off but meaning is clear
+- WRONG only if key content words are missing or clearly wrong
+- Focus feedback on the most important mistake only (1 sentence max, Korean preferred)
+- Do NOT repeat the full correct sentence
+
+Output JSON only (no markdown):
+{"correct":true/false,"reason":"한국어로 핵심 피드백 한 줄"}`}]
         })
       });
       const d=await res.json();
       const txt=d.content?.find(c=>c.type==='text')?.text||'{}';
       result=JSON.parse(txt.replace(/```json|```/g,'').trim());
     }catch(e){
-      // fallback: 단순 비교
-      const normalize=s=>s.toLowerCase().replace(/[.,!?'"]/g,'').replace(/\s+/g,' ').trim();
-      result={correct:normalize(userAnswer)===normalize(s.en),reason:'API 없이 단순 비교'};
+      const norm=t=>t.toLowerCase().replace(/[.,!?'"]/g,'').replace(/\s+/g,' ').trim();
+      result={correct:norm(userAnswer)===norm(s.en),reason:'API 오류 — 단순 비교로 채점했어요.'};
     }
   } else {
-    const normalize=s=>s.toLowerCase().replace(/[.,!?'"]/g,'').replace(/\s+/g,' ').trim();
-    const ok=normalize(userAnswer)===normalize(s.en);
-    result={correct:ok,reason:ok?'정답입니다!':'일부 단어가 다릅니다. API 키를 설정하면 상세 피드백이 제공돼요.'};
+    // API 없을 때 — 단어 수준 유사도로 느슨하게 채점
+    const norm=t=>t.toLowerCase().replace(/[.,!?'"]/g,'').replace(/\s+/g,' ').trim();
+    const uWords=norm(userAnswer).split(' ');
+    const cWords=norm(s.en).split(' ');
+    const matches=uWords.filter(w=>cWords.includes(w)).length;
+    const similarity=matches/Math.max(cWords.length,1);
+    const ok=similarity>=0.75; // 75% 이상 단어 일치 시 정답
+    result={correct:ok,reason:ok?'정답이에요! (유사도 기반)':`핵심 단어가 부족해요. API 키를 설정하면 상세 피드백이 제공돼요.`};
   }
 
   const ok=result.correct;
   if(ok){vOk++;}else{vNg++;}
   updateVStats();
 
-  // 단어별 diff 하이라이트
+  // 단어별 diff 하이라이트 (정답 단어 뜻도 표시)
   const userWords=userAnswer.trim().split(/\s+/);
   const correctWords=s.en.replace(/[.,!?'"]/g,'').split(/\s+/);
   const highlighted=userWords.map((w,i)=>{

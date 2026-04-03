@@ -328,6 +328,11 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   display:flex;align-items:center;justify-content:center;
   transition:all .2s;box-shadow:0 4px 20px rgba(124,106,247,.4);
   position:relative;
+  /* 드래그·텍스트선택·길게누르기 완전 차단 */
+  user-select:none;-webkit-user-select:none;
+  touch-action:none;
+  -webkit-touch-callout:none;
+  -webkit-user-drag:none;
 }
 .mic-btn:hover{transform:scale(1.06);}
 .mic-btn:active{transform:scale(.95);}
@@ -338,7 +343,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   animation:micPulse 1.2s ease-in-out infinite;
 }
 @keyframes micPulse{0%,100%{transform:scale(1);opacity:.6;}50%{transform:scale(1.15);opacity:.2;}}
-.mic-icon{font-size:1.8rem;line-height:1;}
+.mic-icon{font-size:1.8rem;line-height:1;pointer-events:none;user-select:none;-webkit-user-select:none;}
 .mic-label{font-size:.72rem;font-weight:800;color:var(--text2);}
 
 /* 섀도잉 버튼 */
@@ -423,7 +428,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
   <header>
     <div>
       <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노 단어 학습</span>
+      <span class="logo-sub">영어 단어 학습 · by Claude AI</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -1303,6 +1308,21 @@ function go(tab){
 
 /* ─── DASHBOARD ──────────────────────────────────────── */
 function repeatCount(){return Object.values(errCount).filter(v=>v>0).length;}
+
+/* 틀린 단어 2회 이상 → 커스텀카드 매번틀린단어에 자동 등록 */
+function trackWrongWord(word,meaning){
+  if(!word)return;
+  const key='__w__'+word.toLowerCase();
+  errCount[key]=(errCount[key]||0)+1;
+  if(errCount[key]>=2){
+    const mc=CUSTOM_CARDS.find(c=>c.id==='mistake');
+    if(mc&&!mc.items.some(it=>it.correct.toLowerCase()===word.toLowerCase())){
+      mc.items.push({wrong:'?',correct:word,note:meaning||'반복 오답'});
+    }
+  }
+  LS.save();
+}
+
 function renderLearnScreen(){
   const wc=words.length,sc=sents.length,tc=getToeicSents().length;
   const rc=repeatCount(),src=Object.values(sErrCount).filter(v=>v>0).length,trc=Object.values(toeicErrCount).filter(v=>v>0).length;
@@ -1320,35 +1340,45 @@ function renderLearnScreen(){
   document.getElementById('ds-total').textContent=sTotal||wc+sc+tc;
   document.getElementById('ds-correct').textContent=sOkT;
   document.getElementById('ds-review').textContent=totalRepeat;
-  // review alert
   const al=document.getElementById('dash-review-alert');
   if(totalRepeat>0){al.style.display='flex';al.innerHTML=`<div class="dash-review-alert"><span class="dra-icon">⚠️</span><span class="dra-text">복습이 필요한 항목이 <strong>${totalRepeat}개</strong> 있어요!</span><span class="dra-cnt">${totalRepeat}</span></div>`;}else{al.style.display='none';}
-  // word cards
+
+  /* ── 입력 모드에 따라 관련 섹션만 표시 ── */
+  const show=(id,v)=>{const el=document.getElementById(id);if(el)el.style.display=v?'block':'none';};
+  if(inputMode==='word'){
+    show('learn-word-section',true);show('learn-sent-section',false);
+    show('learn-toeic-section',false);show('learn-voice-section',false);
+  }else if(inputMode==='sent'){
+    show('learn-word-section',false);show('learn-sent-section',true);
+    show('learn-toeic-section',false);show('learn-voice-section',true);
+  }else if(inputMode==='toeic'){
+    show('learn-word-section',false);show('learn-sent-section',false);
+    show('learn-toeic-section',true);show('learn-voice-section',true);
+  }else{
+    ['learn-word-section','learn-sent-section','learn-toeic-section','learn-voice-section'].forEach(id=>show(id,true));
+  }
+
   const nw=wc===0,fw=wc<2;
-  ['mc-flash','mc-type'].forEach(id=>document.getElementById(id).classList.toggle('disabled',nw));
-  document.getElementById('mc-quiz').classList.toggle('disabled',fw);
+  ['mc-flash','mc-type'].forEach(id=>document.getElementById(id)?.classList.toggle('disabled',nw));
+  document.getElementById('mc-quiz')?.classList.toggle('disabled',fw);
   const wb=rc>0?`<span class="mc-repeat-badge">🔁${rc}</span>`:'';
   document.getElementById('mc-flash-cnt').innerHTML=nw?'단어 추가 필요':`${wc}개 ${wb}`;
   document.getElementById('mc-quiz-cnt').innerHTML=fw?'2개 이상 필요':`${wc}개 ${wb}`;
   document.getElementById('mc-type-cnt').innerHTML=nw?'단어 추가 필요':`${wc}개 ${wb}`;
-  // sent cards
   const ns=sc===0;
-  ['mc-blank','mc-full'].forEach(id=>document.getElementById(id).classList.toggle('disabled',ns));
+  ['mc-blank','mc-full'].forEach(id=>document.getElementById(id)?.classList.toggle('disabled',ns));
   const sb=src>0?`<span class="mc-repeat-badge">🔁${src}</span>`:'';
   document.getElementById('mc-blank-cnt').innerHTML=ns?'문장 추가 필요':`${sc}개 ${sb}`;
   document.getElementById('mc-full-cnt').innerHTML=ns?'문장 추가 필요':`${sc}개 ${sb}`;
-  // toeic cards
   const nt=tc===0;
-  ['mc-toeic-blank','mc-toeic-full'].forEach(id=>document.getElementById(id).classList.toggle('disabled',nt));
+  ['mc-toeic-blank','mc-toeic-full'].forEach(id=>document.getElementById(id)?.classList.toggle('disabled',nt));
   const tb=trc>0?`<span class="mc-repeat-badge">🔁${trc}</span>`:'';
   const partLabel=selectedPart==='all'?'전체':PART_INFO[selectedPart]?.label;
   document.getElementById('mc-toeic-blank-cnt').innerHTML=nt?'파트 선택 필요':`${partLabel} ${tc}문장 ${tb}`;
   document.getElementById('mc-toeic-full-cnt').innerHTML=nt?'파트 선택 필요':`${partLabel} ${tc}문장 ${tb}`;
-  const vcnt=tc+sents.length;
   document.getElementById('mc-toeic-voice-cnt').innerHTML=`토익 ${tc} + 내 문장 ${sents.length}개`;
-  // voice card (독립 섹션)
   const voiceEl=document.getElementById('mc-voice-cnt');
-  if(voiceEl) voiceEl.innerHTML=`토익 ${tc}문장 + 내 문장 ${sc}개 · 선택한 소스로 스피킹 연습`;
+  if(voiceEl)voiceEl.innerHTML=`토익 ${tc}문장 + 내 문장 ${sc}개`;
 }
 
 /* ─── QUEUES ─────────────────────────────────────────── */
@@ -1359,10 +1389,29 @@ function repeatBanner(cid,sid,ec){const rc=Object.values(ec).filter(v=>v>0).leng
 function initFlash(){if(!words.length){document.getElementById('flash-body').innerHTML='<div class="empty-msg" style="padding:3rem">단어를 먼저 입력해주세요</div>';return;}fQueue=buildQueue([...Array(words.length).keys()],errCount);fIdx=0;fKnow=0;fDunno=0;repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();}
 function updateFStats(){document.getElementById('f-know').textContent=fKnow;document.getElementById('f-dunno').textContent=fDunno;}
 function showFlash(){
-  if(fIdx>=fQueue.length){const pct=Math.round((fKnow/(fKnow+fDunno||1))*100);document.getElementById('flash-body').innerHTML=`<div class="complete-box"><span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span><div class="complete-title">플래시카드 완료!</div><div class="complete-sub">알아요 ${fKnow}개 · 모르겠어요 ${fDunno}개</div><button class="btn primary" onclick="initFlash()">다시 학습</button></div>`;return;}
+  if(fIdx>=fQueue.length){
+    const pct=Math.round((fKnow/(fKnow+fDunno||1))*100);
+    const wrongIdxs=Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length);
+    document.getElementById('flash-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">플래시카드 완료!</div>
+      <div class="complete-sub">알아요 ${fKnow}개 · 모르겠어요 ${fDunno}개</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="initFlash()">다시 학습</button>
+        ${wrongIdxs.length?`<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="reviewFlash()">🔁 복습하기 (${wrongIdxs.length}개)</button>`:''}
+      </div>
+    </div>`;
+    return;
+  }
   const wi=fQueue[fIdx],w=words[wi],pal=palette(wi),isR=(errCount[wi]||0)>0;fFlipped=false;
   document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${w.word}</div><div class="mem-meaning">${w.meaning}</div><div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
   setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);getAI(w.word,w.meaning);
+}
+function reviewFlash(){
+  const wrongIdxs=Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length);
+  if(!wrongIdxs.length)return;
+  fQueue=wrongIdxs.sort(()=>Math.random()-.5);fIdx=0;fKnow=0;fDunno=0;
+  repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();
 }
 async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-section"><div class="ai-label mem-lbl">🖼 이미지 연상</div><div class="ai-text">${ai.scene}</div></div>`;if(ai.memory)h+=`<div class="ai-section"><div class="ai-label mem-lbl2">💡 기억법</div><div class="ai-text">${ai.memory}</div></div>`;if(ai.sentence){const p=ai.sentence.split('|');h+=`<div class="ai-section"><div class="ai-label ex-lbl">📖 예문</div><div class="ai-text"><em>${p[0]?.trim()||''}</em>${p[1]?'<br>'+p[1].trim():''}</div></div>`;}el.innerHTML=h||'<div style="font-size:.73rem;color:var(--text3);text-align:center;padding:.5rem">API 키를 설정하면 AI 연상법이 표시돼요</div>';}
 function markFlash(wi,know){if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
@@ -1370,28 +1419,107 @@ function markFlash(wi,know){if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math
 /* ─── QUIZ ───────────────────────────────────────────── */
 function initQuiz(){if(words.length<2){document.getElementById('quiz-body').innerHTML='<div class="empty-msg" style="padding:3rem">퀴즈는 단어 2개 이상 필요해요</div>';return;}qQueue=buildQueue([...Array(words.length).keys()],errCount);qIdx=0;qOk=0;qNg=0;qAnswered=false;repeatBanner('q-rq-banner','q-repeat',errCount);updateQStats();showQuiz();}
 function updateQStats(){document.getElementById('q-ok').textContent=qOk;document.getElementById('q-ng').textContent=qNg;}
+let _qEnterBound=false;
+function _qEnterHandler(e){
+  if(e.key!=='Enter')return;
+  const next=document.getElementById('qnext');
+  if(next&&next.style.display!=='none'){nextQuiz();}
+}
 function showQuiz(){
-  if(qIdx>=qQueue.length){const pct=Math.round((qOk/(qOk+qNg||1))*100);document.getElementById('quiz-body').innerHTML=`<div class="complete-box"><span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span><div class="complete-title">퀴즈 완료! ${pct}점</div><div class="complete-sub">정답 ${qOk} · 오답 ${qNg}</div><button class="btn primary" onclick="initQuiz()">다시 풀기</button></div>`;return;}
+  if(_qEnterBound){document.removeEventListener('keydown',_qEnterHandler);_qEnterBound=false;}
+  if(qIdx>=qQueue.length){
+    const pct=Math.round((qOk/(qOk+qNg||1))*100);
+    const wrongIdxs=[...new Set(Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length))];
+    document.getElementById('quiz-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">퀴즈 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${qOk} · 오답 ${qNg}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="initQuiz()">다시 풀기</button>
+        ${wrongIdxs.length?`<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="reviewQuiz()">🔁 복습하기 (${wrongIdxs.length}개)</button>`:''}
+      </div>
+    </div>`;
+    return;
+  }
   const wi=qQueue[qIdx],correct=words[wi],isR=(errCount[wi]||0)>0;
   const others=words.filter((_,i)=>i!==wi).sort(()=>Math.random()-.5).slice(0,3);
   const opts=[...others,correct].sort(()=>Math.random()-.5);qAnswered=false;
-  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${correct.word}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts">${opts.map(o=>`<button class="qopt" data-meaning="${o.meaning.replace(/"/g,'&quot;')}" onclick="answerQuiz(this,'${o.meaning.replace(/'/g,"\\'")}','${correct.meaning.replace(/'/g,"\\'")}',${wi})">${o.meaning}</button>`).join('')}</div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 →</button>`;
+  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${correct.word}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts">${opts.map(o=>`<button class="qopt" data-meaning="${o.meaning.replace(/"/g,'&quot;')}" onclick="answerQuiz(this,'${o.meaning.replace(/'/g,"\\'")}','${correct.meaning.replace(/'/g,"\\'")}',${wi})">${o.meaning}</button>`).join('')}</div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
 }
-async function answerQuiz(btn,chosen,correct,wi){if(qAnswered)return;qAnswered=true;document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});const ok=chosen===correct;if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;}updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';const w=words[wi],pal=palette(wi);fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${correct}`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';document.getElementById('qnext').style.display='block';}
-function nextQuiz(){qIdx++;showQuiz();}
+function reviewQuiz(){
+  const wrongIdxs=[...new Set(Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length))];
+  if(!wrongIdxs.length)return;
+  qQueue=wrongIdxs.sort(()=>Math.random()-.5);qIdx=0;qOk=0;qNg=0;qAnswered=false;
+  repeatBanner('q-rq-banner','q-repeat',errCount);updateQStats();showQuiz();
+}
+async function answerQuiz(btn,chosen,correct,wi){
+  if(qAnswered)return;qAnswered=true;
+  document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});
+  const ok=chosen===correct;
+  if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
+  else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;trackWrongWord(words[wi]?.word,words[wi]?.meaning);}
+  updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();
+  const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
+  const w=words[wi],pal=palette(wi);
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${correct}</strong>`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
+  const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;
+  let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';
+  const nxt=document.getElementById('qnext');if(nxt)nxt.style.display='block';
+  // 엔터 → 다음 문제
+  if(!_qEnterBound){_qEnterBound=true;document.addEventListener('keydown',_qEnterHandler);}
+}
+function nextQuiz(){if(_qEnterBound){document.removeEventListener('keydown',_qEnterHandler);_qEnterBound=false;}qIdx++;showQuiz();}
 
 /* ─── TYPE ───────────────────────────────────────────── */
 function initType(){if(!words.length){document.getElementById('type-body').innerHTML='<div class="empty-msg" style="padding:3rem">단어를 먼저 입력해주세요</div>';return;}tQueue=buildQueue([...Array(words.length).keys()],errCount);tIdx=0;tOk=0;tNg=0;repeatBanner('t-rq-banner','t-repeat',errCount);updateTStats();showType();}
 function updateTStats(){document.getElementById('t-ok').textContent=tOk;document.getElementById('t-ng').textContent=tNg;}
 function showType(){
-  if(tIdx>=tQueue.length){const pct=Math.round((tOk/(tOk+tNg||1))*100);document.getElementById('type-body').innerHTML=`<div class="complete-box"><span class="complete-emoji">${pct>=80?'✨':pct>=50?'📝':'💪'}</span><div class="complete-title">받아쓰기 완료! ${pct}점</div><div class="complete-sub">정답 ${tOk} · 오답 ${tNg}</div><button class="btn primary" onclick="initType()">다시 풀기</button></div>`;return;}
+  if(tIdx>=tQueue.length){
+    const pct=Math.round((tOk/(tOk+tNg||1))*100);
+    const wrongIdxs=[...new Set(Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length))];
+    document.getElementById('type-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'✨':pct>=50?'📝':'💪'}</span>
+      <div class="complete-title">받아쓰기 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${tOk} · 오답 ${tNg}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="initType()">다시 풀기</button>
+        ${wrongIdxs.length?`<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="reviewType()">🔁 복습하기 (${wrongIdxs.length}개)</button>`:''}
+      </div>
+    </div>`;
+    return;
+  }
   const wi=tQueue[tIdx],w=words[wi],isR=(errCount[wi]||0)>0;
-  document.getElementById('type-body').innerHTML=`<div class="tword-card" id="tcard">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="tmeaning">${w.meaning}</div><div class="hint-boxes" id="hboxes">${w.word.split('').map((ch,i)=>`<div class="hbox${i===0?' ok2':''}" id="hb${i}">${i===0?ch.toUpperCase():' '}</div>`).join('')}</div></div><div class="tinput-row"><input class="tinput" id="tinput" type="text" placeholder="영어로 입력..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/><button class="btn" id="tchk" onclick="checkType(${wi})">확인</button></div><div class="feedback-box" id="tfb"></div><div id="tai-out"></div><button class="btn btn-wide" id="tnext" style="display:none;margin-top:.25rem" onclick="nextType()">다음 →</button>`;
+  document.getElementById('type-body').innerHTML=`<div class="tword-card" id="tcard">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="tmeaning">${w.meaning}</div><div class="hint-boxes" id="hboxes">${w.word.split('').map((ch,i)=>`<div class="hbox${i===0?' ok2':''}" id="hb${i}">${i===0?ch.toUpperCase():' '}</div>`).join('')}</div></div><div class="tinput-row" id="tinput-row"><input class="tinput" id="tinput" type="text" placeholder="영어로 입력..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/><button class="btn" id="tchk" onclick="checkType(${wi})">확인</button></div><div class="feedback-box" id="tfb"></div><div id="tai-out"></div><button class="btn btn-wide" id="tnext" style="display:none;margin-top:.25rem" onclick="nextType()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
   const inp=document.getElementById('tinput');inp.focus();const tgt=w.word.toLowerCase();
   inp.addEventListener('input',()=>{const val=inp.value.toLowerCase();w.word.split('').forEach((_,i)=>{const hb=document.getElementById('hb'+i);if(!hb)return;if(i===0){hb.textContent=w.word[0].toUpperCase();hb.className='hbox ok2';return;}if(i<val.length){hb.textContent=inp.value[i]||'';hb.className='hbox '+(val[i]===tgt[i]?'ok2':'ng2');}else if(i===val.length){hb.textContent=' ';hb.className='hbox cur';}else{hb.textContent=' ';hb.className='hbox';}});});
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkType(wi);});
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'){const nxt=document.getElementById('tnext');if(nxt&&nxt.style.display!=='none'){nextType();}else{checkType(wi);}}});
 }
-async function checkType(wi){const inp=document.getElementById('tinput');const val=inp.value.trim();if(!val)return;inp.disabled=true;const chk=document.getElementById('tchk');if(chk)chk.disabled=true;const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();inp.classList.add(ok?'tok':'tng');w.word.split('').forEach((ch,i)=>{const hb=document.getElementById('hb'+i);if(hb){hb.textContent=ch;hb.className='hbox '+(ok?'ok2':'ng2');}});if(ok){tOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{tNg++;errCount[wi]=(errCount[wi]||0)+1;const tc=document.getElementById('tcard');if(tc){tc.classList.add('shake');setTimeout(()=>tc.classList.remove('shake'),300);}}updateTStats();repeatBanner('t-rq-banner','t-repeat',errCount);renderWordList();const fb=document.getElementById('tfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';const pal=palette(wi);fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: ${w.word}`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);const ai=await getAI(w.word,w.meaning);const el=document.getElementById('tfbai');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';document.getElementById('tnext').style.display='block';}
+function reviewType(){
+  const wrongIdxs=[...new Set(Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length))];
+  if(!wrongIdxs.length)return;
+  tQueue=wrongIdxs.sort(()=>Math.random()-.5);tIdx=0;tOk=0;tNg=0;
+  repeatBanner('t-rq-banner','t-repeat',errCount);updateTStats();showType();
+}
+async function checkType(wi){
+  const inp=document.getElementById('tinput');const val=inp.value.trim();if(!val)return;
+  inp.disabled=true;const chk=document.getElementById('tchk');if(chk)chk.disabled=true;
+  // 채점 후 입력란 숨기기
+  const row=document.getElementById('tinput-row');if(row)row.style.display='none';
+  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();
+  inp.classList.add(ok?'tok':'tng');
+  w.word.split('').forEach((ch,i)=>{const hb=document.getElementById('hb'+i);if(hb){hb.textContent=ch;hb.className='hbox '+(ok?'ok2':'ng2');}});
+  if(ok){tOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
+  else{tNg++;errCount[wi]=(errCount[wi]||0)+1;trackWrongWord(w.word,w.meaning);const tc=document.getElementById('tcard');if(tc){tc.classList.add('shake');setTimeout(()=>tc.classList.remove('shake'),300);}}
+  updateTStats();repeatBanner('t-rq-banner','t-repeat',errCount);renderWordList();LS.save();
+  const fb=document.getElementById('tfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
+  const pal=palette(wi);
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${w.word}</strong> (${w.meaning})`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
+  const ai=await getAI(w.word,w.meaning);const el=document.getElementById('tfbai');if(!el)return;
+  let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';
+  document.getElementById('tnext').style.display='block';
+}
 function nextType(){tIdx++;showType();}
 
 /* ─── SENT HELPERS ───────────────────────────────────── */
@@ -1415,66 +1543,131 @@ function setSentModeAndGo(m,src){sentMode=m;const t=document.getElementById('sen
 function initSent(){if(!sents.length){document.getElementById('sent-body').innerHTML=`<div class="empty-msg" style="padding:3rem">문장을 먼저 입력해주세요<br><button class="btn" style="margin-top:.75rem" onclick="go('input');switchInputMode('sent')">문장 추가하러 가기</button></div>`;return;}sQueue=buildQueue([...Array(sents.length).keys()],sErrCount);sIdx=0;sOk=0;sNg=0;updateSStats();showSent();}
 function updateSStats(){document.getElementById('s-ok').textContent=sOk;document.getElementById('s-ng').textContent=sNg;document.getElementById('s-prog').textContent=`${sIdx}/${sQueue.length}`;}
 function showSent(){
-  if(sIdx>=sQueue.length){const pct=Math.round((sOk/(sOk+sNg||1))*100);document.getElementById('sent-body').innerHTML=`<div class="complete-box"><span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span><div class="complete-title">문장 학습 완료! ${pct}점</div><div class="complete-sub">정답 ${sOk} · 오답 ${sNg}</div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn primary" onclick="initSent()">다시 풀기</button><button class="btn" onclick="go('input');switchInputMode('sent')">문장 추가</button></div></div>`;return;}
+  if(sIdx>=sQueue.length){
+    const pct=Math.round((sOk/(sOk+sNg||1))*100);
+    const wrongIdxs=[...new Set(Object.keys(sErrCount).filter(k=>sErrCount[k]>0).map(Number).filter(i=>i<sents.length))];
+    document.getElementById('sent-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">문장 학습 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${sOk} · 오답 ${sNg}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="initSent()">다시 풀기</button>
+        ${wrongIdxs.length?`<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="reviewSent()">🔁 복습하기 (${wrongIdxs.length}개)</button>`:''}
+        <button class="btn" onclick="go('input');switchInputMode('sent')">문장 추가</button>
+      </div>
+    </div>`;
+    return;
+  }
   const si=sQueue[sIdx],s=sents[si],isR=(sErrCount[si]||0)>0;
   updateSStats();
   if(sentMode==='blank')showSentBlank(si,s,isR,'sent-body','s');
   else showSentFull(si,s,isR,'sent-body','s');
 }
+function reviewSent(){
+  const wrongIdxs=[...new Set(Object.keys(sErrCount).filter(k=>sErrCount[k]>0).map(Number).filter(i=>i<sents.length))];
+  if(!wrongIdxs.length)return;
+  sQueue=wrongIdxs.sort(()=>Math.random()-.5);sIdx=0;sOk=0;sNg=0;updateSStats();showSent();
+}
 function showSentBlank(si,s,isR,bodyId,prefix){
   const blank=pickBlank(s.en);
-  // \b 대신 단어 단위로 직접 split→join으로 첫 번째 일치 치환 (대소문자 무시)
-  const words=s.en.split(/(\s+)/); // 공백 포함 split
+  const wparts=s.en.split(/(\s+)/);
   let replaced=false;
-  const dispParts=words.map(part=>{
+  const dispParts=wparts.map(part=>{
     if(!replaced&&part.replace(/[.,!?'"]/g,'').toLowerCase()===blank.toLowerCase()){
-      replaced=true;
-      return '<span class="blank-word">_____</span>';
+      replaced=true;return '<span class="blank-word">_____</span>';
     }
     return part;
   });
-  // 혹시 매칭 실패 시 마지막 단어 강제 치환
   if(!replaced){
     const nonSpace=dispParts.filter(p=>!/^\s+$/.test(p));
-    if(nonSpace.length){
-      const last=nonSpace[nonSpace.length-1];
-      const lastIdx=dispParts.lastIndexOf(last);
-      dispParts[lastIdx]='<span class="blank-word">_____</span>';
-    }
+    if(nonSpace.length){const last=nonSpace[nonSpace.length-1];const lastIdx=dispParts.lastIndexOf(last);dispParts[lastIdx]='<span class="blank-word">_____</span>';}
   }
   const disp=dispParts.join('');
-  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">빈칸 채우기</div><div class="sent-ko-display">${s.ko}</div><div class="blank-sentence">${disp}</div></div><div class="blank-input-wrap"><input class="blank-input" id="${prefix}binp" type="text" placeholder="빈칸에 들어갈 단어" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-blank="${blank.replace(/"/g,'&quot;')}" data-si="${si}" data-prefix="${prefix}"/><button class="btn" onclick="checkBlank('${prefix}')">확인</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 →</button>`;
-  const inp=document.getElementById(prefix+'binp');inp.focus();inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkBlank(prefix);});
+  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">빈칸 채우기</div><div class="sent-ko-display">${s.ko}</div><div class="blank-sentence">${disp}</div></div><div class="blank-input-wrap" id="${prefix}binp-row"><input class="blank-input" id="${prefix}binp" type="text" placeholder="빈칸에 들어갈 단어" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-blank="${blank.replace(/"/g,'&quot;')}" data-si="${si}" data-prefix="${prefix}"/><button class="btn" id="${prefix}bchk" onclick="checkBlank('${prefix}')">확인</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  const inp=document.getElementById(prefix+'binp');inp.focus();
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){
+      const nxt=document.getElementById(prefix+'next');
+      if(nxt&&nxt.style.display!=='none'){next_safe(prefix);}else{checkBlank(prefix);}
+    }
+  });
 }
 function checkBlank(prefix){
   const inp=document.getElementById(prefix+'binp');const val=inp.value.trim();if(!val)return;
-  const blank=inp.dataset.blank;const si=parseInt(inp.dataset.si);inp.disabled=true;
-  const ok=normalize(val)===normalize(blank);inp.classList.add(ok?'tok':'tng');
+  const blank=inp.dataset.blank;const si=parseInt(inp.dataset.si);
+  // 채점 후 입력란+버튼 숨기기
+  const row=document.getElementById(prefix+'binp-row');if(row)row.style.display='none';
+  inp.disabled=true;
+  const ok=normalize(val)===normalize(blank);
   const isUser=(prefix==='s');
-  if(isUser){if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;}updateSStats();renderSentList();}
-  else{if(ok){tsOk++;if(toeicErrCount[si]>0)toeicErrCount[si]=Math.max(0,toeicErrCount[si]-1);}else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;}updateTsStats();}
+  if(isUser){
+    if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
+    else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;trackWrongWord(blank,null);}
+    updateSStats();renderSentList();LS.save();
+  }else{
+    if(ok){tsOk++;if(toeicErrCount[si]>0)toeicErrCount[si]=Math.max(0,toeicErrCount[si]-1);}
+    else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;trackWrongWord(blank,null);}
+    updateTsStats();
+  }
   const src=isUser?sents[si]:getToeicSents()[si];
   const fb=document.getElementById(prefix+'fb');fb.style.display='block';fb.className='feedback-box '+(ok?'ok':'ng');
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 정답: <strong>${blank}</strong>`}</div><div style="font-size:.78rem;color:var(--text2);font-weight:600;line-height:1.7;margin-top:.4rem">${src.en}<br><span style="color:var(--text3)">${src.ko}</span></div>`;
+  // 틀린 경우: 정답 단어 뜻도 표시 (단어장에서 찾기)
+  let blankMeaning='';
+  if(!ok){
+    const found=words.find(w=>w.word.toLowerCase()===blank.toLowerCase());
+    if(found)blankMeaning=` (뜻: ${found.meaning})`;
+  }
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 정답: <strong>${blank}</strong>${blankMeaning}`}</div><div style="font-size:.78rem;color:var(--text2);font-weight:600;line-height:1.7;margin-top:.4rem">${src.en}<br><span style="color:var(--text3)">${src.ko}</span></div>`;
   document.getElementById(prefix+'next').style.display='block';
 }
 function showSentFull(si,s,isR,bodyId,prefix){
-  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">전체 받아쓰기</div><div class="sent-ko-display">${s.ko}</div></div><textarea class="full-sent-textarea" id="${prefix}finp" placeholder="영어 문장 전체 입력... (Ctrl+Enter로 채점)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea><button class="btn primary btn-wide" onclick="checkFull('${prefix}',${si})" style="margin-bottom:.75rem">채점하기</button><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 →</button>`;
-  const ta=document.getElementById(prefix+'finp');ta.focus();ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey))checkFull(prefix,si);});
+  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">전체 받아쓰기</div><div class="sent-ko-display">${s.ko}</div></div><div id="${prefix}full-input-wrap"><textarea class="full-sent-textarea" id="${prefix}finp" placeholder="영어 문장 전체 입력... (Ctrl+Enter로 채점)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea><button class="btn primary btn-wide" id="${prefix}fchk" onclick="checkFull('${prefix}',${si})" style="margin-bottom:.75rem">채점하기</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  const ta=document.getElementById(prefix+'finp');ta.focus();
+  ta.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){
+      const nxt=document.getElementById(prefix+'next');
+      if(nxt&&nxt.style.display!=='none'){next_safe(prefix);}else{checkFull(prefix,si);}
+    }
+  });
 }
 function checkFull(prefix,si){
-  const ta=document.getElementById(prefix+'finp');const val=ta.value.trim();if(!val)return;ta.disabled=true;
+  const ta=document.getElementById(prefix+'finp');const val=ta.value.trim();if(!val)return;
+  ta.disabled=true;
+  // 채점 후 입력란+채점버튼 숨기기
+  const wrap=document.getElementById(prefix+'full-input-wrap');if(wrap)wrap.style.display='none';
   const isUser=(prefix==='s');const src=isUser?sents[si]:getToeicSents()[si];
   const ok=normalize(val)===normalize(src.en);ta.classList.add(ok?'tok':'tng');
-  if(isUser){if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;const c=document.getElementById('scard');if(c){c.classList.add('shake');setTimeout(()=>c.classList.remove('shake'),300);}}updateSStats();renderSentList();}
-  else{if(ok){tsOk++;if(toeicErrCount[si]>0)toeicErrCount[si]=Math.max(0,toeicErrCount[si]-1);}else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;const c=document.getElementById('tscard');if(c){c.classList.add('shake');setTimeout(()=>c.classList.remove('shake'),300);}}updateTsStats();}
+  if(isUser){
+    if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
+    else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;}
+    updateSStats();renderSentList();LS.save();
+  }else{
+    if(ok){tsOk++;if(toeicErrCount[si]>0)toeicErrCount[si]=Math.max(0,toeicErrCount[si]-1);}
+    else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;}
+    updateTsStats();
+  }
   const fb=document.getElementById(prefix+'fb');fb.style.display='block';fb.className='feedback-box '+(ok?'ok':'ng');
   if(ok){fb.innerHTML=`<div class="fb-top ok">🎉 완벽해요!</div>`;}
-  else{const diff=wordDiff(val,src.en);fb.innerHTML=`<div class="fb-top ng">❌ 틀렸어요. 정답을 확인하세요</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem;font-weight:700">내가 쓴 답 (빨간색=틀림)</div><div class="diff-result">${diff}</div><div style="font-size:.72rem;color:var(--text3);margin:.5rem 0 .3rem;font-weight:700">정답</div><div style="font-size:.82rem;font-weight:700;color:var(--green);line-height:1.7">${src.en}</div>`;}
+  else{
+    // 틀린 단어 뜻 찾기 + trackWrongWord
+    const iWords=val.replace(/[.,!?'"]/g,'').split(/\s+/);
+    const cWords=src.en.replace(/[.,!?'"]/g,'').split(/\s+/);
+    const diffHtml=iWords.map((w,i)=>{
+      const c=w.toLowerCase(),cc=(cWords[i]||'').toLowerCase();
+      if(c===cc)return`<span class="diff-ok">${w}</span>`;
+      trackWrongWord(cWords[i],null);
+      const found=words.find(wd=>wd.word.toLowerCase()===cc);
+      const tip=found?` <span style="font-size:.62rem;color:var(--amber)">(${found.meaning})</span>`:'';
+      return`<span class="diff-ng">${w}</span>${tip}`;
+    }).join(' ');
+    fb.innerHTML=`<div class="fb-top ng">❌ 틀렸어요.</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem;font-weight:700">내가 쓴 답 (빨간=틀림, 노란=뜻)</div><div class="diff-result">${diffHtml}</div><div style="font-size:.72rem;color:var(--text3);margin:.5rem 0 .3rem;font-weight:700">정답</div><div style="font-size:.82rem;font-weight:700;color:var(--green);line-height:1.7">${src.en}</div>`;
+  }
   document.getElementById(prefix+'next').style.display='block';
 }
+function next_safe(prefix){if(prefix==='s'){sIdx++;showSent();}else if(prefix==='ts'){tsIdx++;showToeic();}}
 // next functions for each prefix
 window.next_s=function(){sIdx++;showSent();};
+window.next_ts=function(){tsIdx++;showToeic();};
 
 /* ─── TOEIC SENT ─────────────────────────────────────── */
 function initToeic(){
@@ -1484,13 +1677,31 @@ function initToeic(){
 }
 function updateTsStats(){document.getElementById('ts-ok').textContent=tsOk;document.getElementById('ts-ng').textContent=tsNg;document.getElementById('ts-prog').textContent=`${tsIdx}/${tsQueue.length}`;}
 function showToeic(){
-  if(tsIdx>=tsQueue.length){const pct=Math.round((tsOk/(tsOk+tsNg||1))*100);document.getElementById('toeic-body').innerHTML=`<div class="complete-box"><span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span><div class="complete-title">토익스피킹 학습 완료! ${pct}점</div><div class="complete-sub">정답 ${tsOk} · 오답 ${tsNg}</div><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn primary" onclick="initToeic()">다시 풀기</button><button class="btn" onclick="go('input');switchInputMode('toeic')">파트 변경</button></div></div>`;return;}
+  if(tsIdx>=tsQueue.length){
+    const pct=Math.round((tsOk/(tsOk+tsNg||1))*100);
+    const wrongIdxs=[...new Set(Object.keys(toeicErrCount).filter(k=>toeicErrCount[k]>0).map(Number).filter(i=>i<getToeicSents().length))];
+    document.getElementById('toeic-body').innerHTML=`<div class="complete-box">
+      <span class="complete-emoji">${pct>=80?'🏆':pct>=50?'👍':'💪'}</span>
+      <div class="complete-title">토익스피킹 학습 완료! ${pct}점</div>
+      <div class="complete-sub">정답 ${tsOk} · 오답 ${tsNg}</div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+        <button class="btn primary" onclick="initToeic()">다시 풀기</button>
+        ${wrongIdxs.length?`<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="reviewToeic()">🔁 복습하기 (${wrongIdxs.length}개)</button>`:''}
+        <button class="btn" onclick="go('input');switchInputMode('toeic')">파트 변경</button>
+      </div>
+    </div>`;
+    return;
+  }
   const si=tsQueue[tsIdx],s=getToeicSents()[si],isR=(toeicErrCount[si]||0)>0;
   updateTsStats();
   if(toeicSentMode==='blank')showSentBlank(si,s,isR,'toeic-body','ts');
   else showSentFull(si,s,isR,'toeic-body','ts');
 }
-window.next_ts=function(){tsIdx++;showToeic();};
+function reviewToeic(){
+  const wrongIdxs=[...new Set(Object.keys(toeicErrCount).filter(k=>toeicErrCount[k]>0).map(Number).filter(i=>i<getToeicSents().length))];
+  if(!wrongIdxs.length)return;
+  tsQueue=wrongIdxs.sort(()=>Math.random()-.5);tsIdx=0;tsOk=0;tsNg=0;updateTsStats();showToeic();
+}
 
 /* ─── VOICE MODE ──────────────────────────────────────── */
 let voiceSource='toeic'; // 'toeic' | 'user'
@@ -1609,24 +1820,31 @@ const isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent)||
 const isChrome=!isSafari&&(!!window.chrome||navigator.userAgent.includes('Chrome'));
 
 /* PTT — 누르는 동안 녹음, 떼면 자동 채점 */
+let _pttSi=null;      // 현재 문제 인덱스
+let _pttReleased=false; // 손을 뗐는지 여부
+
 function pttStart(si){
   if(isRecording)return;
+  _pttSi=si;
+  _pttReleased=false;
   startRecording(si);
 }
+
 function pttEnd(si){
+  _pttReleased=true;
   if(!isRecording)return;
-  // Safari: onend에서 처리, Chrome: 여기서 중지 후 onresult isFinal 처리
-  if(recognition){
-    try{recognition.stop();}catch(e){}
-  }
+  isRecording=false; // 먼저 false로 — onend에서 중복처리 방지
+  if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
   if(btn)btn.classList.remove('recording');
   if(lbl)lbl.textContent='처리 중...';
+  if(recognition){try{recognition.stop();}catch(e){}}
+  // onend에서 transcript 처리됨
 }
 
-let vSilenceTimer=null;  // 무음 타임아웃
-let vFinalTranscript=''; // 최종 누적 텍스트
+let vSilenceTimer=null;
+let vFinalTranscript='';
 
 function startRecording(si){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1637,79 +1855,79 @@ function startRecording(si){
   }
   recognition=new SpeechRecognition();
   recognition.lang='en-US';
-  recognition.maxAlternatives=3;
-  recognition.continuous=false; // Safari는 continuous=true 불안정
-  // Safari는 interimResults 지원이 불완전 → false로 고정
-  recognition.interimResults=isChrome?true:false;
+  recognition.maxAlternatives=1;
+  recognition.continuous=false;
+  recognition.interimResults=isChrome; // Safari: false, Chrome: true
 
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
   const res=document.getElementById('sttResult');
   if(btn)btn.classList.add('recording');
-  if(lbl)lbl.textContent=isSafari?'녹음 중... (말한 뒤 잠시 기다리세요)':'녹음 중... (다시 탭하면 중지)';
+  if(lbl)lbl.textContent='🔴 녹음 중... (손 떼면 채점)';
   if(res){res.textContent='🎙 듣고 있어요...';res.classList.remove('has-text');}
   isRecording=true;
+  _pttReleased=false;
   vStartTime=Date.now();
   vFinalTranscript='';
 
-  // Safari용 무음 타임아웃 (8초 말 없으면 자동 제출)
-  if(isSafari){
-    vSilenceTimer=setTimeout(()=>{
-      if(isRecording)stopRecording(si,false);
-    },8000);
-  }
-
   recognition.onresult=(e)=>{
-    // 타임아웃 리셋 (말하는 중이면 연장)
-    if(vSilenceTimer){clearTimeout(vSilenceTimer);}
-
     let interim='';
     for(let i=e.resultIndex;i<e.results.length;i++){
-      const t=e.results[i][0].transcript;
-      if(e.results[i].isFinal){vFinalTranscript+=t+' ';}
-      else{interim+=t;}
+      if(e.results[i].isFinal) vFinalTranscript+=e.results[i][0].transcript+' ';
+      else interim+=e.results[i][0].transcript;
     }
     const display=(vFinalTranscript+interim).trim();
     if(res&&display){res.textContent=display;res.classList.add('has-text');}
-
-    // Chrome: isFinal 확인 후 즉시 처리
-    if(isChrome&&e.results[e.results.length-1].isFinal){
-      stopRecording(si,false);
-      const elapsed=((Date.now()-vStartTime)/1000).toFixed(1);
-      checkVoiceAnswer(si,vFinalTranscript.trim()||display,elapsed);
-    }
   };
 
   recognition.onerror=(e)=>{
-    if(vSilenceTimer)clearTimeout(vSilenceTimer);
-    stopRecording(si,false);
+    if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
+    isRecording=false;
+    if(btn)btn.classList.remove('recording');
+    if(lbl)lbl.textContent='누르고 있는 동안 녹음';
     const msg={
-      'no-speech':'음성이 감지되지 않았어요. 마이크에 가까이 말해보세요.',
+      'no-speech':'음성이 감지되지 않았어요. 마이크 가까이서 말해보세요.',
       'not-allowed':'마이크 권한이 필요해요. 브라우저 설정에서 허용해주세요.',
-      'network':'네트워크 오류가 발생했어요.',
-    }[e.error]||`오류: ${e.error}`;
-    if(res)res.textContent=`⚠️ ${msg}`;
+      'network':'네트워크 오류가 발생했어요. HTTPS 환경에서 사용해주세요.',
+      'aborted':'',  // 정상 중단 (PTT 손 뗌)
+    }[e.error]??`오류: ${e.error}`;
+    if(msg&&res)res.textContent=`⚠️ ${msg}`;
   };
 
-  // onend: Safari는 여기서 최종 결과를 처리
   recognition.onend=()=>{
-    if(vSilenceTimer)clearTimeout(vSilenceTimer);
-    if(!isRecording)return; // 이미 stopRecording 호출됨
-    stopRecording(si,false);
-    const transcript=(vFinalTranscript.trim()||
-      (res&&res.classList.contains('has-text')?res.textContent:'')).trim();
-    if(transcript){
-      const elapsed=((Date.now()-vStartTime)/1000).toFixed(1);
-      checkVoiceAnswer(si,transcript,elapsed);
-    } else {
-      if(res)res.textContent='⚠️ 음성이 인식되지 않았어요. 다시 시도해주세요.';
+    if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
+    // 버튼 UI 정리
+    if(btn)btn.classList.remove('recording');
+    isRecording=false;
+
+    // transcript 확보 (화면에 표시된 텍스트도 fallback으로 활용)
+    const transcript=(
+      vFinalTranscript.trim() ||
+      (res&&res.classList.contains('has-text')?res.textContent.replace(/^🎙.*$/,'').trim():'')
+    ).trim();
+
+    if(!transcript){
+      // PTT로 손을 뗀 경우지만 transcript가 없으면 — 짧게 말했거나 no-speech
+      if(_pttReleased){
+        if(lbl)lbl.textContent='누르고 있는 동안 녹음';
+        if(res&&!res.classList.contains('has-text'))
+          res.textContent='⚠️ 음성이 너무 짧거나 감지되지 않았어요. 다시 눌러서 말해보세요.';
+      }
+      return;
     }
+
+    if(lbl)lbl.textContent='누르고 있는 동안 녹음';
+    const elapsed=((Date.now()-vStartTime)/1000).toFixed(1);
+    checkVoiceAnswer(si,transcript,elapsed);
   };
 
-  try{recognition.start();}
-  catch(e){
-    stopRecording(si,false);
-    if(res)res.textContent='⚠️ 마이크를 시작할 수 없어요. 잠시 후 다시 시도해주세요.';
+  try{
+    recognition.start();
+  }catch(e){
+    isRecording=false;
+    if(btn)btn.classList.remove('recording');
+    if(lbl)lbl.textContent='누르고 있는 동안 녹음';
+    if(res)res.textContent='⚠️ 마이크를 시작할 수 없어요. 잠시 후 다시 눌러보세요.';
   }
 }
 
@@ -1720,12 +1938,12 @@ function stopRecording(si,manual){
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
   if(btn)btn.classList.remove('recording');
-  if(lbl)lbl.textContent='탭하여 말하기';
-  // 수동 중지(탭)이고 Safari인 경우: onend에서 결과 처리되므로 여기선 아무것도 안 함
+  if(lbl)lbl.textContent='누르고 있는 동안 녹음';
 }
 
 function stopVoiceMode(){
   isRecording=false;
+  _pttReleased=true;
   if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
   if(recognition){try{recognition.abort();}catch(e){}}
   if(speechSynth)speechSynth.cancel();
@@ -1810,12 +2028,13 @@ Output JSON only: {"correct":true/false,"reason":"..."}`}]
 function retryVoice(si){
   vRetryCnt++;
   isRecording=false;
+  _pttReleased=false;
   if(vSilenceTimer){clearTimeout(vSilenceTimer);vSilenceTimer=null;}
   if(recognition){try{recognition.abort();}catch(e){}}
   const btn=document.getElementById('micBtn');
   const lbl=document.getElementById('micLabel');
   if(btn)btn.classList.remove('recording');
-  if(lbl)lbl.textContent='탭하여 말하기';
+  if(lbl)lbl.textContent='누르고 있는 동안 녹음';
   const fb=document.getElementById('voiceFeedback');
   const actions=document.getElementById('voiceActions');
   const sttRes=document.getElementById('sttResult');
@@ -1823,12 +2042,12 @@ function retryVoice(si){
   if(actions){actions.style.display='none';}
   if(sttRes){sttRes.textContent='인식된 음성이 여기에 표시돼요...';sttRes.classList.remove('has-text');}
   const retryCnt=document.getElementById('retryCnt');
-  if(retryCnt)retryCnt.textContent=`재시도 ${vRetryCnt}회 중...`;
-  setTimeout(()=>startRecording(si),400);
+  if(retryCnt)retryCnt.textContent=`재시도 ${vRetryCnt}회`;
 }
 
 function nextVoice(){
-  stopRecording();
+  isRecording=false;
+  if(recognition){try{recognition.abort();}catch(e){}}
   vIdx++;
   showVoice();
 }

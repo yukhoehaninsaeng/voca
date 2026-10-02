@@ -29,4 +29,4 @@ JSON 내보내기는 `schemaVersion: 2`인 envelope에 Item, membership, Progres
 
 일정 간격은 일 단위 반올림 후 최대 365일이다. Again은 0일, Hard는 신규 1일/기존 1.2배, Good은 1일→3일→2배, Easy는 신규 4일/기존 2.5배로 계산한다. Skip, 취소, 인식 실패, 채점 실패는 이벤트만 중립 결과로 남기고 Progress와 정확도를 변경하지 않는다. `mastered`도 `dueDate`가 지나면 복습 후보에 포함된다.
 
-백업 envelope에는 profile, plan, session을 포함한다. API 키는 내보내지 않으며 Gate 1부터 브라우저 API 키 저장과 제공자 직접 호출을 제거했다.
+백업 envelope에는 profile, plan, session을 포함한다. `vm-apikey`와 `vm-ai-model`은 사용자가 AI 연결을 선택한 브라우저에만 저장한다. `vm-ai-cache-v2`는 단어·뜻·프롬프트 버전·모델을 조합한 키를 사용한다. API 키와 AI 캐시는 백업 envelope에 포함하지 않는다.

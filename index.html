@@ -27,9 +27,12 @@
 
 <div class="modal-overlay" id="apiModal" style="display:none">
   <div class="modal">
-    <h2>AI 연결 안내</h2>
-    <p>현재 정적 앱은 API 키를 브라우저에 저장하거나 외부 AI를 직접 호출하지 않습니다. AI 기능은 접근 제어와 사용량 제한이 적용된 서버가 연결된 배포에서만 제공됩니다.</p>
-    <button class="btn primary btn-wide" onclick="document.getElementById('apiModal').style.display='none'">확인</button>
+    <h2>AI 연상법 연결</h2>
+    <p>Anthropic API 키를 이 브라우저의 localStorage에 저장합니다. 개인 기기에서만 사용하고, 공유 기기에서는 사용 후 삭제하세요. 키는 백업에 포함되지 않습니다.</p>
+    <label class="field-label">API 키<input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off"/></label>
+    <label class="field-label">모델<input id="apiModelInput" value="claude-haiku-4-5-20251001" autocomplete="off"/></label>
+    <div id="apiMessage" class="form-error" role="status" aria-live="polite"></div>
+    <div class="modal-actions"><button class="btn primary" type="button" onclick="saveApiKey()">저장</button><button class="btn" type="button" onclick="clearApiKey()">키 삭제</button><button class="btn" type="button" onclick="closeApiModal()">닫기</button></div>
   </div>
 </div>
 
@@ -44,7 +47,7 @@
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <button class="btn-api" onclick="showApiModal()">AI 연결 안내</button>
+      <button class="btn-api" onclick="showApiModal()">🔑 AI 설정</button>
       <button class="btn-api" disabled title="실제 Whisper 전사 연결은 준비 중입니다" id="whisperBtn">🎤 Whisper 준비 중</button>
       <span class="header-badge" id="apiStatus">AI OFF</span>
     </div>

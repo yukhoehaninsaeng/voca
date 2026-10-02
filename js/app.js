@@ -67,11 +67,15 @@ function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds,item
 function toggleTheme(){document.body.classList.toggle('light');const l=document.body.classList.contains('light');localStorage.setItem('vm-theme',l?'light':'dark');document.querySelector('meta[name="theme-color"]').setAttribute('content',l?'#f5f5f8':'#0f0f13');}
 (function(){const s=localStorage.getItem('vm-theme');if(s==='light'){document.body.classList.add('light');document.querySelector('meta[name="theme-color"]').setAttribute('content','#f5f5f8');}})();
 
-/* ─── AI SERVER STATUS ───────────────────────────────── */
-function showApiModal(){alert('AI 기능은 안전한 서버 연결이 설정된 배포에서만 사용할 수 있습니다. 로컬 학습은 AI 없이 계속됩니다.');}
-function clearApiKey(){localStorage.removeItem('vm-apikey');}
-localStorage.removeItem('vm-apikey');
-document.getElementById('apiModal').style.display='none';
+/* ─── OPTIONAL LOCAL AI CONNECTION ──────────────────── */
+let API_KEY=localStorage.getItem('vm-apikey')||'',AI_MODEL=localStorage.getItem('vm-ai-model')||'claude-haiku-4-5-20251001';
+try{aiCache=JSON.parse(localStorage.getItem('vm-ai-cache-v2')||'{}');}catch(error){aiCache={};}
+function updateApiStatus(){const badge=document.getElementById('apiStatus');badge.textContent=API_KEY?'AI ON':'AI OFF';badge.classList.toggle('connected',Boolean(API_KEY));}
+function showApiModal(){document.getElementById('apiKeyInput').value=API_KEY;document.getElementById('apiModelInput').value=AI_MODEL;document.getElementById('apiMessage').textContent='';document.getElementById('apiModal').style.display='flex';}
+function closeApiModal(){document.getElementById('apiModal').style.display='none';}
+function saveApiKey(){const key=document.getElementById('apiKeyInput').value.trim(),model=document.getElementById('apiModelInput').value.trim();if(!key||!model){document.getElementById('apiMessage').textContent='API 키와 모델을 모두 입력해주세요.';return;}API_KEY=key;AI_MODEL=model;localStorage.setItem('vm-apikey',key);localStorage.setItem('vm-ai-model',model);updateApiStatus();document.getElementById('apiMessage').textContent='이 브라우저에 저장했습니다.';setTimeout(closeApiModal,500);}
+function clearApiKey(){API_KEY='';localStorage.removeItem('vm-apikey');updateApiStatus();document.getElementById('apiKeyInput').value='';document.getElementById('apiMessage').textContent='저장된 키를 삭제했습니다.';}
+updateApiStatus();
 
 /* ─── CANVAS ─────────────────────────────────────────── */
 const PAL=[['#1a2a4a','#0d1f3c','#5b9df9'],['#0d2e22','#0a2019','#1eca8b'],['#2e1f0a','#231600','#f5a623'],['#2a0d22','#1f0a18','#e86daa'],['#1a0d3a','#130929','#9b7cf8'],['#0d2a1a','#091f12','#4ec98a']];
@@ -79,7 +83,17 @@ function palette(i){return PAL[i%PAL.length];}
 function drawScene(canvas,word,meaning,pal){const ctx=canvas.getContext('2d');const W=canvas.width=canvas.offsetWidth||340;const H=canvas.height=canvas.offsetHeight||120;ctx.clearRect(0,0,W,H);const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,pal[0]);g.addColorStop(1,pal[1]);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);const seed=word.charCodeAt(0)*31+word.length;for(let i=0;i<7;i++){const x=((seed*(i+1)*137)%W);const y=((seed*(i+2)*79)%H);const r=20+((seed*(i+3)*53)%45);ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=pal[2]+(i%2===0?'20':'10');ctx.fill();}ctx.font=`900 ${Math.min(W,H)*.55}px Nunito,sans-serif`;ctx.fillStyle=pal[2]+'18';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(word[0].toUpperCase(),W*.8,H*.5);}
 
 /* ─── AI ─────────────────────────────────────────────── */
-async function getAI(){return{scene:'',memory:'',sentence:''};}
+async function getAI(word,meaning){
+  if(!API_KEY)return{scene:'',memory:'',sentence:'',error:'AI 설정에서 API 키를 먼저 저장해주세요.'};
+  const cacheKey=VocabCore.stableHash(`${word}\n${meaning}\nv1\n${AI_MODEL}`);if(aiCache[cacheKey])return aiCache[cacheKey];
+  try{
+    const response=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:AI_MODEL,max_tokens:400,messages:[{role:'user',content:`한국인 영어 학습자가 "${word}" (${meaning})를 기억하도록 도와주세요. JSON만 응답하세요: {"scene":"짧은 장면","memory":"자연스러운 기억 단서","sentence":"쉬운 영어 예문 | 한국어 뜻"}`} ]})});
+    if(!response.ok){let detail='';try{detail=(await response.json()).error?.message||'';}catch(error){}throw new Error(detail||`API 요청 실패 (${response.status})`);}
+    const data=await response.json(),text=data.content?.find(part=>part.type==='text')?.text;if(!text)throw new Error('AI 응답에 텍스트가 없습니다.');
+    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());if(!['scene','memory','sentence'].every(key=>typeof parsed[key]==='string'))throw new Error('AI 응답 형식이 올바르지 않습니다.');
+    aiCache[cacheKey]=parsed;localStorage.setItem('vm-ai-cache-v2',JSON.stringify(aiCache));return parsed;
+  }catch(error){return{scene:'',memory:'',sentence:'',error:error.message||'AI 요청에 실패했습니다.'};}
+}
 
 const escapeHtml=VocabCore.escapeHtml;
 function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
@@ -314,7 +328,7 @@ function showFlash(){
   }
   const wi=fQueue[fIdx],w=words[wi],pal=palette(wi),isR=(errCount[wi]||0)>0;fFlipped=false;
   document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${escapeHtml(w.word)}</div><div class="mem-meaning">${escapeHtml(w.meaning)}</div><div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
-  setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);getAI(w.word,w.meaning);
+  setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);
 }
 function reviewFlash(){
   const wrongIdxs=Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length);
@@ -322,7 +336,7 @@ function reviewFlash(){
   fQueue=wrongIdxs.sort(()=>Math.random()-.5);fIdx=0;fKnow=0;fDunno=0;
   repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();
 }
-async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;const sentence=(ai.sentence||'').split('|').map(value=>value.trim()).filter(Boolean).join(' / ');renderAiText(el,[{label:'🖼 이미지 연상',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory},{label:'📖 예문',className:'ex-lbl',text:sentence}]);if(!el.childElementCount)el.textContent='API 키를 설정하면 AI 연상법이 표시돼요';}
+async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;const sentence=(ai.sentence||'').split('|').map(value=>value.trim()).filter(Boolean).join(' / ');renderAiText(el,[{label:'🖼 이미지 연상',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory},{label:'📖 예문',className:'ex-lbl',text:sentence}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';}
 function markFlash(wi,know){const studied=words[wi];recordResult(studied._itemType||'word',studied.word,studied.meaning,'flash',know,selection.sourceIds,studied._itemId);if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
 
 /* ─── QUIZ ───────────────────────────────────────────── */
@@ -374,7 +388,7 @@ async function answerQuiz(btn,chosen,correct,wi){
   fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(correct)}</strong>`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;
-  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);
+  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';
   const nxt=document.getElementById('qnext');if(nxt)nxt.style.display='block';
   // 엔터 → 다음 문제
   if(!_qEnterBound){_qEnterBound=true;document.addEventListener('keydown',_qEnterHandler);}
@@ -426,7 +440,7 @@ async function checkType(wi){
   fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(w.word)}</strong> (${escapeHtml(w.meaning)})`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('tfbai');if(!el)return;
-  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);
+  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';
   document.getElementById('tnext').style.display='block';
 }
 function nextType(){tIdx++;showType();}

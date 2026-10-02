@@ -51,14 +51,14 @@ try {
   VocabCore.migrationReport(localStorage,catalog,{words:ownedWords,sents:ownedSents,errCount,sErrCount});
   const snapshot=repository.loadSnapshot();
   progressById={...catalog.seedProgress,...snapshot.progress};
-  studyEvents=Array.isArray(snapshot.events)?snapshot.events:[];
-  if(snapshot.selection&&Array.isArray(snapshot.selection.sourceIds))selection={...selection,...snapshot.selection};
+  studyEvents=snapshot.events;
+  selection=snapshot.selection||selection;
   userProfile=snapshot.profile;
   dailyPlan=snapshot.plan;
   dailySession=snapshot.session;
 } catch(e) { setTimeout(()=>alert('데이터 마이그레이션을 완료하지 못했습니다. 기존 백업은 보존되었습니다: '+e.message),0); }
 function rebuildCatalog(){catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});}
-function persistV2(){try{repository.saveSnapshot({progress:progressById,events:studyEvents,selection,profile:userProfile,plan:dailyPlan,session:dailySession});return true;}catch(error){console.error('학습 상태 저장 실패',error);return false;}}
+function persistV2(){repository.saveSnapshot({progress:progressById,events:studyEvents,selection,profile:userProfile,plan:dailyPlan,session:dailySession});}
 function currentItem(type,en,ko){return catalog.items.find(i=>i.type===type&&i.normalizedEn===VocabCore.normalize(en)&&i.normalizedKo===VocabCore.normalize(ko));}
 function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds,itemId=null){const item=itemId?catalog.items.find(candidate=>candidate.id===itemId):currentItem(type,en,ko);if(!item)return;const task=dailySession?.steps?.find(step=>step.itemId===item.id&&!dailySession.results[`${dailySession.sessionId}:${step.taskId}`]),attemptId=task?`${dailySession.sessionId}:${task.taskId}`:null,event=VocabCore.recordStudyEvent({progress:progressById,events:studyEvents},{itemId:item.id,sourceIds,mode,correct,attemptId,taskType:task?.taskType,skill:task?.skill,sessionId:dailySession?.sessionId||'web'});if(task)VocabCore.submitSessionAttempt(dailySession,{taskId:task.taskId,attemptId,eventId:event.id});persistV2();}
 

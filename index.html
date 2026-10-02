@@ -29,6 +29,22 @@
     <h2>AI 연결 안내</h2>
     <p>현재 정적 앱은 API 키를 브라우저에 저장하거나 외부 AI를 직접 호출하지 않습니다. AI 기능은 접근 제어와 사용량 제한이 적용된 서버가 연결된 배포에서만 제공됩니다.</p>
     <button class="btn primary btn-wide" onclick="document.getElementById('apiModal').style.display='none'">확인</button>
+<div class="modal-overlay" id="onboardingModal" style="display:none">
+  <form class="modal" onsubmit="finishOnboarding(event)">
+    <h2>나에게 맞는 오늘 학습</h2><p>진단 없이도 바로 시작할 수 있고 설정은 나중에 바꿀 수 있어요.</p>
+    <label class="field-label">목표<select id="profileGoal"><option value="both">일상 회화 + 토익스피킹</option><option value="daily">일상 회화</option><option value="toeic">토익스피킹</option></select></label>
+    <label class="field-label">하루 시간<select id="profileMinutes"><option value="15">15분</option><option value="10">10분</option><option value="5">5분</option></select></label>
+    <label class="field-label">수준<select id="profileLevel"><option value="unknown">잘 모르겠어요</option><option value="beginner">초급</option><option value="intermediate">중급</option></select></label>
+    <label class="field-label">관심 주제 (선택)<input id="profileInterests" placeholder="여행, 면접"/></label>
+    <button class="btn primary btn-wide" type="submit">오늘 학습 보기</button>
+  </form>
+</div>
+
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>AI 연결 안내</h2>
+    <p>현재 정적 앱은 API 키를 브라우저에 저장하거나 외부 AI를 직접 호출하지 않습니다. AI 기능은 접근 제어와 사용량 제한이 적용된 서버가 연결된 배포에서만 제공됩니다.</p>
+    <button class="btn primary btn-wide" onclick="document.getElementById('apiModal').style.display='none'">확인</button>
   </div>
 </div>
 
@@ -99,7 +115,7 @@
   </div>
 
   <!-- ② LEARN DASHBOARD -->
-  <div class="screen on" id="s-learn">
+  <div class="screen" id="s-learn">
     <section class="today-card" aria-labelledby="today-title">
       <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
       <p id="today-duration">오늘 약 0분</p>

@@ -1549,7 +1549,7 @@ const CUSTOM_CARDS=[
 const PART_INFO={
   all:{label:'전체',sub:'파트2~5 전체'},
   p2:{label:'파트 2',sub:'사진 묘사'},
-  p3:{label:'파트 3',sub:'만능문장 50'},
+  p3:{label:'파트 3',sub:'만능문장'},
   p4:{label:'파트 4',sub:'유형별 템플릿'},
-  p5:{label:'파트 5',sub:'만능문장 49'},
+  p5:{label:'파트 5',sub:'만능문장'},
 };

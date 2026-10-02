@@ -25,19 +25,6 @@
   </div>
 </div>
 
-<!-- OpenAI Whisper 키 모달 -->
-<div class="modal-overlay" id="openaiModal" style="display:none">
-  <div class="modal">
-    <h2>🎤 OpenAI API 키 입력</h2>
-    <p>음성 인식(Whisper)을 사용하면 인식률이 크게 향상돼요.<br><a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>에서 발급받을 수 있어요.<br>키는 localStorage에만 저장되고 외부로 전송되지 않아요.</p>
-    <input type="password" id="openaiKeyInput" placeholder="sk-..." autocomplete="off"/>
-    <button class="btn primary btn-wide" onclick="saveOpenAIKey()" style="background:var(--green);border-color:var(--green)">Whisper 활성화</button>
-    <div style="height:8px"></div>
-    <button class="btn btn-wide" onclick="document.getElementById('openaiModal').style.display='none'">나중에 설정하기</button>
-    <div class="modal-note">💡 키 없이도 Web Speech API(브라우저 기본)로 작동해요</div>
-  </div>
-</div>
-
 <div class="page-wrap">
   <header>
     <div>

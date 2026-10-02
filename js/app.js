@@ -4,10 +4,6 @@ const LS={
     try{
       localStorage.setItem('vm-words',JSON.stringify(typeof ownedWords!=='undefined'?ownedWords:words));
       localStorage.setItem('vm-sents',JSON.stringify(typeof ownedSents!=='undefined'?ownedSents:sents));
-      localStorage.setItem('vm-errCount',JSON.stringify(errCount));
-      localStorage.setItem('vm-sErrCount',JSON.stringify(sErrCount));
-      localStorage.setItem('vm-selectedPart',selectedPart||'all');
-      localStorage.setItem('vm-selectedCustom',selectedCustom||'');
     }catch(e){}
   },
   load(){
@@ -53,16 +49,18 @@ LS.load();
 let ownedWords=words,ownedSents=sents,selectedStudyItems=null;
 let catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});
 let progressById={},studyEvents=[],selection={sourceIds:['mine_words'],mode:'flash',updatedAt:Date.now()};
+const repository=new VocabCore.LocalStorageRepository(localStorage);
 try {
   VocabCore.migrationReport(localStorage,catalog,{words:ownedWords,sents:ownedSents,errCount,sErrCount});
-  progressById=JSON.parse(localStorage.getItem('vm-progress-v2')||'{}');
-  studyEvents=JSON.parse(localStorage.getItem('vm-events-v2')||'[]');
-  selection=JSON.parse(localStorage.getItem('vm-selection-v2')||JSON.stringify(selection));
+  const snapshot=repository.loadSnapshot();
+  progressById={...catalog.seedProgress,...snapshot.progress};
+  studyEvents=snapshot.events;
+  selection=snapshot.selection||selection;
 } catch(e) { setTimeout(()=>alert('데이터 마이그레이션을 완료하지 못했습니다. 기존 백업은 보존되었습니다: '+e.message),0); }
 function rebuildCatalog(){catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});}
-function persistV2(){localStorage.setItem('vm-progress-v2',JSON.stringify(progressById));localStorage.setItem('vm-events-v2',JSON.stringify(studyEvents));localStorage.setItem('vm-selection-v2',JSON.stringify(selection));}
+function persistV2(){repository.saveSnapshot({progress:progressById,events:studyEvents,selection});}
 function currentItem(type,en,ko){return catalog.items.find(i=>i.type===type&&i.normalizedEn===VocabCore.normalize(en)&&i.normalizedKo===VocabCore.normalize(ko));}
-function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds){const item=currentItem(type,en,ko);if(!item)return;VocabCore.recordStudyEvent({progress:progressById,events:studyEvents},{itemId:item.id,sourceIds,mode,correct,sessionId:'web'});persistV2();}
+function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds,itemId=null){const item=itemId?catalog.items.find(candidate=>candidate.id===itemId):currentItem(type,en,ko);if(!item)return;VocabCore.recordStudyEvent({progress:progressById,events:studyEvents},{itemId:item.id,sourceIds,mode,correct,sessionId:'web'});persistV2();}
 
 
 /* ─── THEME ─────────────────────────────────────────── */
@@ -100,15 +98,16 @@ function drawScene(canvas,word,meaning,pal){const ctx=canvas.getContext('2d');co
 /* ─── AI ─────────────────────────────────────────────── */
 async function getAI(word,meaning){if(aiCache[word])return aiCache[word];if(!API_KEY)return{scene:'',memory:'',sentence:''};try{const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:400,messages:[{role:'user',content:`영어 단어 "${word}" (뜻: ${meaning})에 대해 JSON만 응답:{"scene":"시각적 장면 1-2문장","memory":"한국인 연상법 1문장","sentence":"예문 | 한국어"}`}]})});const d=await res.json();const txt=d.content?.find(c=>c.type==='text')?.text||'{}';const p=JSON.parse(txt.replace(/```json|```/g,'').trim());aiCache[word]=p;return p;}catch(e){return{scene:'',memory:'',sentence:''};}}
 
+const escapeHtml=VocabCore.escapeHtml;
+function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
+
 /* ─── WORD LIST ──────────────────────────────────────── */
-function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=words.length===0;if(!words.length){el.innerHTML='<div class="empty-msg">단어를 추가하면<br>AI 이미지 연상법을 만들어줘요 ✨</div>';return;}el.innerHTML=words.map((w,i)=>{const ec=errCount[i]||0;return`<div class="wi"><span class="wd">${w.word}</span><span class="mn">${w.meaning}</span>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delWord(${i})">×</button></div>`;}).join('');}
 function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;ownedWords.push({word:w,meaning:m});words=ownedWords;wi.value='';mi.value='';rebuildCatalog();renderWordList();wi.focus();LS.save();}
 function delWord(i){ownedWords.splice(i,1);words=ownedWords;delete errCount[i];rebuildCatalog();renderWordList();LS.save();persistV2();}
 document.getElementById('mi').addEventListener('keydown',e=>{if(e.key==='Enter')addWord();});
 document.getElementById('wi').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mi').focus();});
 
 /* ─── SENT LIST ──────────────────────────────────────── */
-function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=sents.length===0;if(!sents.length){el.innerHTML='<div class="empty-msg">문장을 추가해 학습해요 ✨</div>';return;}el.innerHTML=sents.map((s,i)=>{const ec=sErrCount[i]||0;return`<div class="wi swi"><div class="swi-row"><div class="swi-texts"><div class="sent-en">${s.en}</div><div class="sent-ko">${s.ko}</div></div>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delSent(${i})">×</button></div></div>`;}).join('');}
 function addSent(){const ei=document.getElementById('si-en'),ki=document.getElementById('si-ko');const e=ei.value.trim(),k=ki.value.trim();if(!e||!k)return;ownedSents.push({en:e,ko:k});sents=ownedSents;ei.value='';ki.value='';rebuildCatalog();renderSentList();ei.focus();LS.save();}
 function delSent(i){ownedSents.splice(i,1);sents=ownedSents;delete sErrCount[i];rebuildCatalog();renderSentList();LS.save();persistV2();}
 document.getElementById('si-ko').addEventListener('keydown',e=>{if(e.key==='Enter')addSent();});
@@ -239,20 +238,12 @@ function go(tab){
 }
 
 /* ─── DASHBOARD ──────────────────────────────────────── */
-function repeatCount(){return Object.values(errCount).filter(v=>v>0).length;}
+function repeatCount(){return Object.entries(errCount).filter(([key,value])=>!key.startsWith('__w__')&&value>0).length;}
 
 /* 틀린 단어 2회 이상 → 커스텀카드 매번틀린단어에 자동 등록 */
 function trackWrongWord(word,meaning){
-  if(!word)return;
-  const key='__w__'+word.toLowerCase();
-  errCount[key]=(errCount[key]||0)+1;
-  if(errCount[key]>=2){
-    const mc=CUSTOM_CARDS.find(c=>c.id==='mistake');
-    if(mc&&!mc.items.some(it=>it.correct.toLowerCase()===word.toLowerCase())){
-      mc.items.push({wrong:'?',correct:word,note:meaning||'반복 오답'});
-    }
-  }
-  LS.save();
+  // v2에서는 recordStudyEvent()의 Progress.lapses가 mistakes 가상 Source를 계산한다.
+  return Boolean(word||meaning);
 }
 
 function renderLearnScreen(){
@@ -337,7 +328,7 @@ function showFlash(){
     return;
   }
   const wi=fQueue[fIdx],w=words[wi],pal=palette(wi),isR=(errCount[wi]||0)>0;fFlipped=false;
-  document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${w.word}</div><div class="mem-meaning">${w.meaning}</div><div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
+  document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${escapeHtml(w.word)}</div><div class="mem-meaning">${escapeHtml(w.meaning)}</div><div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
   setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);getAI(w.word,w.meaning);
 }
 function reviewFlash(){
@@ -346,8 +337,8 @@ function reviewFlash(){
   fQueue=wrongIdxs.sort(()=>Math.random()-.5);fIdx=0;fKnow=0;fDunno=0;
   repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();
 }
-async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-section"><div class="ai-label mem-lbl">🖼 이미지 연상</div><div class="ai-text">${ai.scene}</div></div>`;if(ai.memory)h+=`<div class="ai-section"><div class="ai-label mem-lbl2">💡 기억법</div><div class="ai-text">${ai.memory}</div></div>`;if(ai.sentence){const p=ai.sentence.split('|');h+=`<div class="ai-section"><div class="ai-label ex-lbl">📖 예문</div><div class="ai-text"><em>${p[0]?.trim()||''}</em>${p[1]?'<br>'+p[1].trim():''}</div></div>`;}el.innerHTML=h||'<div style="font-size:.73rem;color:var(--text3);text-align:center;padding:.5rem">API 키를 설정하면 AI 연상법이 표시돼요</div>';}
-function markFlash(wi,know){const studied=words[wi];recordResult('word',studied.word,studied.meaning,'flash',know);if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
+async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;const sentence=(ai.sentence||'').split('|').map(value=>value.trim()).filter(Boolean).join(' / ');renderAiText(el,[{label:'🖼 이미지 연상',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory},{label:'📖 예문',className:'ex-lbl',text:sentence}]);if(!el.childElementCount)el.textContent='API 키를 설정하면 AI 연상법이 표시돼요';}
+function markFlash(wi,know){const studied=words[wi];recordResult(studied._itemType||'word',studied.word,studied.meaning,'flash',know,selection.sourceIds,studied._itemId);if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
 
 /* ─── QUIZ ───────────────────────────────────────────── */
 function initQuiz(){if(words.length<2){document.getElementById('quiz-body').innerHTML='<div class="empty-msg" style="padding:3rem">퀴즈는 단어 2개 이상 필요해요</div>';return;}qQueue=buildQueue([...Array(words.length).keys()],errCount);qIdx=0;qOk=0;qNg=0;qAnswered=false;repeatBanner('q-rq-banner','q-repeat',errCount);updateQStats();showQuiz();}
@@ -377,7 +368,8 @@ function showQuiz(){
   const wi=qQueue[qIdx],correct=words[wi],isR=(errCount[wi]||0)>0;
   const others=words.filter((_,i)=>i!==wi).sort(()=>Math.random()-.5).slice(0,3);
   const opts=[...others,correct].sort(()=>Math.random()-.5);qAnswered=false;
-  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${correct.word}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts">${opts.map(o=>`<button class="qopt" data-meaning="${o.meaning.replace(/"/g,'&quot;')}" onclick="answerQuiz(this,'${o.meaning.replace(/'/g,"\\'")}','${correct.meaning.replace(/'/g,"\\'")}',${wi})">${o.meaning}</button>`).join('')}</div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${escapeHtml(correct.word)}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts" id="qopts"></div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  const optionHost=document.getElementById('qopts');opts.forEach(option=>{const button=document.createElement('button');button.className='qopt';button.dataset.meaning=option.meaning;button.textContent=option.meaning;button.addEventListener('click',()=>answerQuiz(button,option.meaning,correct.meaning,wi));optionHost.append(button);});
 }
 function reviewQuiz(){
   const wrongIdxs=[...new Set(Object.entries(errCount).filter(([k,v])=>!k.startsWith('__w__')&&v>0).map(([k])=>parseInt(k)).filter(i=>!isNaN(i)&&i<words.length))];
@@ -394,10 +386,10 @@ async function answerQuiz(btn,chosen,correct,wi){
   updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();
   const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
   const w=words[wi],pal=palette(wi);
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${correct}</strong>`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(correct)}</strong>`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;
-  let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';
+  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);
   const nxt=document.getElementById('qnext');if(nxt)nxt.style.display='block';
   // 엔터 → 다음 문제
   if(!_qEnterBound){_qEnterBound=true;document.addEventListener('keydown',_qEnterHandler);}
@@ -423,7 +415,7 @@ function showType(){
     return;
   }
   const wi=tQueue[tIdx],w=words[wi],isR=(errCount[wi]||0)>0;
-  document.getElementById('type-body').innerHTML=`<div class="tword-card" id="tcard">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="tmeaning">${w.meaning}</div><div class="hint-boxes" id="hboxes">${w.word.split('').map((ch,i)=>`<div class="hbox${i===0?' ok2':''}" id="hb${i}">${i===0?ch.toUpperCase():' '}</div>`).join('')}</div></div><div class="tinput-row" id="tinput-row"><input class="tinput" id="tinput" type="text" placeholder="영어로 입력..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/><button class="btn" id="tchk" onclick="checkType(${wi})">확인</button></div><div class="feedback-box" id="tfb"></div><div id="tai-out"></div><button class="btn btn-wide" id="tnext" style="display:none;margin-top:.25rem" onclick="nextType()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  document.getElementById('type-body').innerHTML=`<div class="tword-card" id="tcard">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="tmeaning">${escapeHtml(w.meaning)}</div><div class="hint-boxes" id="hboxes">${w.word.split('').map((ch,i)=>`<div class="hbox${i===0?' ok2':''}" id="hb${i}">${i===0?escapeHtml(ch.toUpperCase()):' '}</div>`).join('')}</div></div><div class="tinput-row" id="tinput-row"><input class="tinput" id="tinput" type="text" placeholder="영어로 입력..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/><button class="btn" id="tchk" onclick="checkType(${wi})">확인</button></div><div class="feedback-box" id="tfb"></div><div id="tai-out"></div><button class="btn btn-wide" id="tnext" style="display:none;margin-top:.25rem" onclick="nextType()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
   const inp=document.getElementById('tinput');inp.focus();const tgt=w.word.toLowerCase();
   inp.addEventListener('input',()=>{const val=inp.value.toLowerCase();w.word.split('').forEach((_,i)=>{const hb=document.getElementById('hb'+i);if(!hb)return;if(i===0){hb.textContent=w.word[0].toUpperCase();hb.className='hbox ok2';return;}if(i<val.length){hb.textContent=inp.value[i]||'';hb.className='hbox '+(val[i]===tgt[i]?'ok2':'ng2');}else if(i===val.length){hb.textContent=' ';hb.className='hbox cur';}else{hb.textContent=' ';hb.className='hbox';}});});
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'){const nxt=document.getElementById('tnext');if(nxt&&nxt.style.display!=='none'){nextType();}else{checkType(wi);}}});
@@ -438,7 +430,7 @@ async function checkType(wi){
   inp.disabled=true;const chk=document.getElementById('tchk');if(chk)chk.disabled=true;
   // 채점 후 입력란 숨기기
   const row=document.getElementById('tinput-row');if(row)row.style.display='none';
-  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();recordResult('word',w.word,w.meaning,'type',ok);
+  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();recordResult(w._itemType||'word',w.word,w.meaning,'type',ok,selection.sourceIds,w._itemId);
   inp.classList.add(ok?'tok':'tng');
   w.word.split('').forEach((ch,i)=>{const hb=document.getElementById('hb'+i);if(hb){hb.textContent=ch;hb.className='hbox '+(ok?'ok2':'ng2');}});
   if(ok){tOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
@@ -446,10 +438,10 @@ async function checkType(wi){
   updateTStats();repeatBanner('t-rq-banner','t-repeat',errCount);renderWordList();LS.save();
   const fb=document.getElementById('tfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
   const pal=palette(wi);
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${w.word}</strong> (${w.meaning})`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(w.word)}</strong> (${escapeHtml(w.meaning)})`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('tfbai');if(!el)return;
-  let h='';if(ai.scene)h+=`<div class="ai-label mem-lbl" style="margin-bottom:.3rem">🖼 연상 장면</div><div class="ai-text" style="margin-bottom:.5rem">${ai.scene}</div>`;if(ai.memory)h+=`<div class="ai-label mem-lbl2" style="margin-bottom:.3rem">💡 기억법</div><div class="ai-text">${ai.memory}</div>`;el.innerHTML=h||'';
+  renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);
   document.getElementById('tnext').style.display='block';
 }
 function nextType(){tIdx++;showType();}
@@ -508,14 +500,14 @@ function showSentBlank(si,s,isR,bodyId,prefix){
     if(!replaced&&part.replace(/[.,!?'"]/g,'').toLowerCase()===blank.toLowerCase()){
       replaced=true;return '<span class="blank-word">_____</span>';
     }
-    return part;
+    return escapeHtml(part);
   });
   if(!replaced){
     const nonSpace=dispParts.filter(p=>!/^\s+$/.test(p));
     if(nonSpace.length){const last=nonSpace[nonSpace.length-1];const lastIdx=dispParts.lastIndexOf(last);dispParts[lastIdx]='<span class="blank-word">_____</span>';}
   }
   const disp=dispParts.join('');
-  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">빈칸 채우기</div><div class="sent-ko-display">${s.ko}</div><div class="blank-sentence">${disp}</div></div><div class="blank-input-wrap" id="${prefix}binp-row"><input class="blank-input" id="${prefix}binp" type="text" placeholder="빈칸에 들어갈 단어" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-blank="${blank.replace(/"/g,'&quot;')}" data-si="${si}" data-prefix="${prefix}"/><button class="btn" id="${prefix}bchk" onclick="checkBlank('${prefix}')">확인</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">빈칸 채우기</div><div class="sent-ko-display">${escapeHtml(s.ko)}</div><div class="blank-sentence">${disp}</div></div><div class="blank-input-wrap" id="${prefix}binp-row"><input class="blank-input" id="${prefix}binp" type="text" placeholder="빈칸에 들어갈 단어" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-blank="${escapeHtml(blank)}" data-si="${si}" data-prefix="${prefix}"/><button class="btn" id="${prefix}bchk" onclick="checkBlank('${prefix}')">확인</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
   const inp=document.getElementById(prefix+'binp');inp.focus();
   inp.addEventListener('keydown',e=>{
     if(e.key==='Enter'){
@@ -530,8 +522,8 @@ function checkBlank(prefix){
   // 채점 후 입력란+버튼 숨기기
   const row=document.getElementById(prefix+'binp-row');if(row)row.style.display='none';
   inp.disabled=true;
-  const ok=normalize(val)===normalize(blank);recordResult('sentence',src.en,src.ko,'blank',ok,prefix==='ts'?selection.sourceIds:['mine_sentences']);
-  const isUser=(prefix==='s');
+  const isUser=(prefix==='s'),src=isUser?sents[si]:getToeicSents()[si];
+  const ok=normalize(val)===normalize(blank);recordResult('sentence',src.en,src.ko,'blank',ok,prefix==='ts'?selection.sourceIds:['mine_sentences'],src._itemId);
   if(isUser){
     if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
     else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;trackWrongWord(blank,null);}
@@ -541,7 +533,6 @@ function checkBlank(prefix){
     else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;}
     updateTsStats();
   }
-  const src=isUser?sents[si]:getToeicSents()[si];
   const fb=document.getElementById(prefix+'fb');fb.style.display='block';fb.className='feedback-box '+(ok?'ok':'ng');
   // 틀린 경우: 정답 단어 뜻도 표시 (단어장에서 찾기)
   let blankMeaning='';
@@ -549,11 +540,11 @@ function checkBlank(prefix){
     const found=words.find(w=>w.word.toLowerCase()===blank.toLowerCase());
     if(found)blankMeaning=` (뜻: ${found.meaning})`;
   }
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 정답: <strong>${blank}</strong>${blankMeaning}`}</div><div style="font-size:.78rem;color:var(--text2);font-weight:600;line-height:1.7;margin-top:.4rem">${src.en}<br><span style="color:var(--text3)">${src.ko}</span></div>`;
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 정답: <strong>${escapeHtml(blank)}</strong>${escapeHtml(blankMeaning)}`}</div><div style="font-size:.78rem;color:var(--text2);font-weight:600;line-height:1.7;margin-top:.4rem">${escapeHtml(src.en)}<br><span style="color:var(--text3)">${escapeHtml(src.ko)}</span></div>`;
   document.getElementById(prefix+'next').style.display='block';
 }
 function showSentFull(si,s,isR,bodyId,prefix){
-  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">전체 받아쓰기</div><div class="sent-ko-display">${s.ko}</div></div><div id="${prefix}full-input-wrap"><textarea class="full-sent-textarea" id="${prefix}finp" placeholder="영어 문장 전체 입력... (Ctrl+Enter로 채점)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea><button class="btn primary btn-wide" id="${prefix}fchk" onclick="checkFull('${prefix}',${si})" style="margin-bottom:.75rem">채점하기</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  document.getElementById(bodyId).innerHTML=`<div class="sent-card" id="${prefix}card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="sent-mode-label">전체 받아쓰기</div><div class="sent-ko-display">${escapeHtml(s.ko)}</div></div><div id="${prefix}full-input-wrap"><textarea class="full-sent-textarea" id="${prefix}finp" placeholder="영어 문장 전체 입력... (Ctrl+Enter로 채점)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea><button class="btn primary btn-wide" id="${prefix}fchk" onclick="checkFull('${prefix}',${si})" style="margin-bottom:.75rem">채점하기</button></div><div class="feedback-box" id="${prefix}fb"></div><button class="btn btn-wide" id="${prefix}next" style="display:none;margin-top:.25rem" onclick="next_${prefix}()">다음 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
   const ta=document.getElementById(prefix+'finp');ta.focus();
   ta.addEventListener('keydown',e=>{
     if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){
@@ -568,7 +559,7 @@ function checkFull(prefix,si){
   // 채점 후 입력란+채점버튼 숨기기
   const wrap=document.getElementById(prefix+'full-input-wrap');if(wrap)wrap.style.display='none';
   const isUser=(prefix==='s');const src=isUser?sents[si]:getToeicSents()[si];
-  const ok=normalize(val)===normalize(src.en);recordResult('sentence',src.en,src.ko,'full',ok,prefix==='ts'?selection.sourceIds:['mine_sentences']);ta.classList.add(ok?'tok':'tng');
+  const ok=normalize(val)===normalize(src.en);recordResult('sentence',src.en,src.ko,'full',ok,prefix==='ts'?selection.sourceIds:['mine_sentences'],src._itemId);ta.classList.add(ok?'tok':'tng');
   if(isUser){
     if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
     else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;}
@@ -586,13 +577,13 @@ function checkFull(prefix,si){
     const cWords=src.en.replace(/[.,!?'"]/g,'').split(/\s+/);
     const diffHtml=iWords.map((w,i)=>{
       const c=w.toLowerCase(),cc=(cWords[i]||'').toLowerCase();
-      if(c===cc)return`<span class="diff-ok">${w}</span>`;
+      if(c===cc)return`<span class="diff-ok">${escapeHtml(w)}</span>`;
       trackWrongWord(cWords[i],null);
       const found=words.find(wd=>wd.word.toLowerCase()===cc);
-      const tip=found?` <span style="font-size:.62rem;color:var(--amber)">(${found.meaning})</span>`:'';
-      return`<span class="diff-ng">${w}</span>${tip}`;
+      const tip=found?` <span style="font-size:.62rem;color:var(--amber)">(${escapeHtml(found.meaning)})</span>`:'';
+      return`<span class="diff-ng">${escapeHtml(w)}</span>${tip}`;
     }).join(' ');
-    fb.innerHTML=`<div class="fb-top ng">❌ 틀렸어요.</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem;font-weight:700">내가 쓴 답 (빨간=틀림, 노란=뜻)</div><div class="diff-result">${diffHtml}</div><div style="font-size:.72rem;color:var(--text3);margin:.5rem 0 .3rem;font-weight:700">정답</div><div style="font-size:.82rem;font-weight:700;color:var(--green);line-height:1.7">${src.en}</div>`;
+    fb.innerHTML=`<div class="fb-top ng">❌ 틀렸어요.</div><div style="font-size:.72rem;color:var(--text3);margin-bottom:.35rem;font-weight:700">내가 쓴 답 (빨간=틀림, 노란=뜻)</div><div class="diff-result">${diffHtml}</div><div style="font-size:.72rem;color:var(--text3);margin:.5rem 0 .3rem;font-weight:700">정답</div><div style="font-size:.82rem;font-weight:700;color:var(--green);line-height:1.7">${escapeHtml(src.en)}</div>`;
   }
   document.getElementById(prefix+'next').style.display='block';
 }
@@ -710,7 +701,7 @@ function renderVoiceCard(s,si){
   document.getElementById('voice-body').innerHTML=`
     <div class="voice-card">
       <div class="voice-progress">${vIdx+1} / ${vQueue.length} 번째 문장</div>
-      <div class="voice-ko">${s.ko}</div>
+      <div class="voice-ko">${escapeHtml(s.ko)}</div>
       <div style="font-size:.7rem;color:var(--text3);font-weight:700;margin-bottom:.5rem">위 한국어를 영어로 말해보세요</div>
 
       <!-- 힌트: 정답 문장 보기/가리기 -->
@@ -719,7 +710,7 @@ function renderVoiceCard(s,si){
           💡 정답 힌트 보기
         </button>
         <div id="hintBox" style="display:none;margin-top:.5rem;padding:.625rem .875rem;background:var(--amber-bg);border:1px solid rgba(245,166,35,.25);border-radius:var(--r-sm);font-size:.82rem;font-weight:700;color:var(--amber);line-height:1.6;word-break:break-word;">
-          ${s.en}
+          ${escapeHtml(s.en)}
         </div>
       </div>
 
@@ -731,7 +722,7 @@ function renderVoiceCard(s,si){
         </button>
         <span class="mic-label" id="micLabel">누르고 있는 동안 녹음</span>
       </div>
-      <button class="shadow-btn" id="shadowBtn" onclick="playShadow('${s.en.replace(/'/g,"\\'")}')">
+      <button class="shadow-btn" id="shadowBtn">
         🔊 섀도잉 — 먼저 듣기
       </button>
     </div>
@@ -743,6 +734,7 @@ function renderVoiceCard(s,si){
     </div>
     <div class="retry-count" id="retryCnt"></div>
   `;
+  document.getElementById('shadowBtn')?.addEventListener('click',()=>playShadow(s.en));
 }
 
 function toggleHint(){
@@ -969,7 +961,7 @@ Output JSON only (no markdown):
   }
 
   const ok=result.correct;
-  recordResult('sentence',s.en,s.ko,'speak',ok,selection.sourceIds);
+  recordResult('sentence',s.en,s.ko,'speak',ok,selection.sourceIds,s._itemId);
   if(ok){vOk++;}else{vNg++;}
   updateVStats();
 
@@ -980,8 +972,8 @@ Output JSON only (no markdown):
     const clean=w.replace(/[.,!?'"]/g,'').toLowerCase();
     const cClean=(correctWords[i]||'').toLowerCase();
     return clean===cClean
-      ?`<span class="stt-word-ok">${w}</span>`
-      :`<span class="stt-word-ng">${w}</span>`;
+      ?`<span class="stt-word-ok">${escapeHtml(w)}</span>`
+      :`<span class="stt-word-ng">${escapeHtml(w)}</span>`;
   }).join(' ');
   if(sttRes){sttRes.innerHTML=highlighted;sttRes.classList.add('has-text');}
 
@@ -989,8 +981,8 @@ Output JSON only (no markdown):
   const speedBadge=`<span class="speed-badge">⏱ ${elapsed}초</span>`;
   fb.innerHTML=`
     <div class="vf-top ${ok?'ok':'ng'}">${ok?`🎉 정답이에요! ${speedBadge}`:`❌ 틀렸어요 ${speedBadge}`}</div>
-    <div class="vf-reason">${result.reason}</div>
-    ${!ok?`<div class="vf-correct">✅ 정답: ${s.en}</div>`:''}
+    <div class="vf-reason">${escapeHtml(result.reason)}</div>
+    ${!ok?`<div class="vf-correct">✅ 정답: ${escapeHtml(s.en)}</div>`:''}
   `;
 
   if(actions){
@@ -1048,20 +1040,23 @@ function renderSelection(){
   const visible=catalog.sources.filter(s=>s.id!=='vocab_master_all');host.replaceChildren();
   visible.forEach(source=>{const label=document.createElement('label');label.className='source-option';const box=document.createElement('input');box.type='checkbox';box.checked=selection.sourceIds.includes(source.id);box.addEventListener('change',()=>toggleSource(source.id,box.checked));const name=document.createElement('span');name.textContent=source.name;const count=document.createElement('small');count.textContent=VocabCore.selectItems([source.id],catalog,progressById).length+'개';label.append(box,name,count);host.append(label);});
   const items=VocabCore.selectItems(selection.sourceIds,catalog,progressById),counts=VocabCore.selectCounts(items,progressById);document.getElementById('sel-total').textContent=counts.total;document.getElementById('sel-fresh').textContent=counts.fresh;document.getElementById('sel-due').textContent=counts.due;
-  const modes={flash:'플래시카드',quiz:'객관식',type:'뜻→영 입력',blank:'빈칸',full:'전체 받아쓰기',speak:'음성 말하기'},mh=document.getElementById('mode-selector');mh.replaceChildren();Object.entries(modes).forEach(([id,name])=>{const compatible=VocabCore.compatibleItems(items,id),button=document.createElement('button');button.className='mode-option'+(selection.mode===id?' active':'');button.disabled=!compatible.length;button.textContent=name;const small=document.createElement('small');small.textContent=compatible.length?`실제 학습 큐 ${compatible.length}개`:`선택 항목 타입과 호환되지 않음`;button.append(small);button.addEventListener('click',()=>{selection.mode=id;selection.updatedAt=Date.now();persistV2();renderSelection();});mh.append(button);});
-  const today=VocabCore.selectTodayStats(studyEvents);document.getElementById('ds-total').textContent=today.attempts;document.getElementById('ds-correct').textContent=today.correct;document.getElementById('ds-review').textContent=counts.due;document.getElementById('dash-ring-pct').textContent=(today.accuracy??0)+'%';document.getElementById('dash-sub').textContent=today.attempts?`오늘 ${today.attempts}문제 · 정확도 ${today.accuracy}%`:`선택 항목 ${counts.total}개 · 오늘 복습 ${counts.due}개`;
-  const start=document.getElementById('today-start'),queue=VocabCore.compatibleItems(items,selection.mode);start.disabled=!selection.mode||!queue.length;document.getElementById('selection-help').textContent=queue.length?`선택 Source의 중복을 제거한 ${queue.length}개 항목을 학습합니다.`:'Source와 호환되는 Mode를 선택해주세요.';
+  const modes={flash:'플래시카드',quiz:'객관식',type:'뜻→영 입력',blank:'빈칸',full:'전체 받아쓰기',speak:'음성 말하기'},mh=document.getElementById('mode-selector');mh.replaceChildren();Object.entries(modes).forEach(([id,name])=>{const compatible=VocabCore.compatibleItems(items,id),minimum=id==='quiz'?2:1,button=document.createElement('button');button.className='mode-option'+(selection.mode===id?' active':'');button.disabled=compatible.length<minimum;button.textContent=name;const small=document.createElement('small');small.textContent=compatible.length>=minimum?`실제 학습 큐 ${compatible.length}개`:id==='quiz'&&compatible.length===1?'객관식은 단어 2개 이상 필요':'선택 항목 타입과 호환되지 않음';button.append(small);button.addEventListener('click',()=>{selection.mode=id;selection.updatedAt=Date.now();persistV2();renderSelection();});mh.append(button);});
+  const today=VocabCore.selectTodayStats(studyEvents),accuracy=today.accuracy??0;document.getElementById('ds-total').textContent=today.attempts;document.getElementById('ds-correct').textContent=today.correct;document.getElementById('ds-review').textContent=counts.due;document.getElementById('dash-ring-pct').textContent=accuracy+'%';document.getElementById('dash-ring-circle').style.strokeDashoffset=163.4-(accuracy/100)*163.4;document.getElementById('dash-sub').textContent=today.attempts?`오늘 ${today.attempts}문제 · 정확도 ${today.accuracy}%`:`선택 항목 ${counts.total}개 · 오늘 복습 ${counts.due}개`;const alert=document.getElementById('dash-review-alert');alert.replaceChildren();alert.style.display=counts.due?'flex':'none';if(counts.due){const message=document.createElement('div');message.className='dash-review-alert';message.textContent=`오늘 복습할 항목이 ${counts.due}개 있어요!`;alert.append(message);}
+  const start=document.getElementById('today-start'),queue=VocabCore.compatibleItems(items,selection.mode),canStart=queue.length>=(selection.mode==='quiz'?2:1);start.disabled=!selection.mode||!canStart;document.getElementById('selection-help').textContent=canStart?`선택 Source의 중복을 제거한 ${queue.length}개 항목을 학습합니다.`:'Source와 호환되는 Mode를 선택해주세요.';
 }
 function toggleSource(id,checked){const set=new Set(selection.sourceIds);checked?set.add(id):set.delete(id);selection={...selection,sourceIds:[...set],updatedAt:Date.now()};persistV2();renderSelection();}
-function startSelectedMode(){const items=VocabCore.compatibleItems(VocabCore.selectItems(selection.sourceIds,catalog,progressById),selection.mode);if(!items.length)return;selectedStudyItems=items;if(items[0].type==='word'){words=items.map(i=>({word:i.en,meaning:i.ko}));if(selection.mode==='flash')go('flash');else if(selection.mode==='quiz')go('quiz');else go('type');return;}sents=items.map(i=>({en:i.en,ko:i.ko}));selectedPart=null;selectedCustom=null;if(selection.mode==='speak'){voiceSource='user';go('voice');}else if(selection.mode==='blank'||selection.mode==='full'){setSentModeAndGo(selection.mode,'user');}else{sentMode='full';go('sent');}}
+function startSelectedMode(){const items=VocabCore.compatibleItems(VocabCore.selectItems(selection.sourceIds,catalog,progressById),selection.mode);if(!items.length)return;selectedStudyItems=items;if(['flash','quiz','type'].includes(selection.mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));if(selection.mode==='flash')go('flash');else if(selection.mode==='quiz')go('quiz');else go('type');return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));selectedPart=null;selectedCustom=null;if(selection.mode==='speak'){voiceSource='user';go('voice');}else setSentModeAndGo(selection.mode,'user');}
 function clearApiKey(){API_KEY='';localStorage.removeItem('vm-apikey');document.getElementById('apiKeyInput').value='';document.getElementById('apiStatus').textContent='AI OFF';document.getElementById('apiModal').style.display='none';}
 function filterLibrary(query){const q=VocabCore.normalize(query);document.querySelectorAll('#wlist .wi,#slist .wi').forEach(row=>{row.style.display=!q||VocabCore.normalize(row.textContent).includes(q)?'':'none';});}
 function parsedBulk(){return document.getElementById('bulk-input').value.split(/\r?\n/).filter(Boolean).map((line,index)=>{const parts=line.split(/\s*[|\t]\s*/);return{line:index+1,en:(parts[0]||'').trim(),ko:(parts.slice(1).join(' | ')||'').trim(),valid:parts.length>1&&parts[0].trim()&&parts[1].trim()};});}
-function previewBulk(){const rows=parsedBulk(),valid=rows.filter(r=>r.valid).length;document.getElementById('bulk-preview').textContent=`${rows.length}줄 중 ${valid}개 등록 가능 · ${rows.length-valid}개 무효`;}
+function previewBulk(){const rows=parsedBulk(),valid=rows.filter(row=>row.valid).length,host=document.getElementById('bulk-preview');host.replaceChildren();const summary=document.createElement('div');summary.textContent=`${rows.length}줄 중 ${valid}개 등록 가능 · ${rows.length-valid}개 무효`;host.append(summary);rows.slice(0,20).forEach(row=>{const line=document.createElement('div');line.className=row.valid?'preview-valid':'preview-invalid';line.textContent=row.valid?`${row.line}. ${row.en} → ${row.ko}`:`${row.line}. 구분자(| 또는 탭)와 영어·한국어를 확인하세요.`;host.append(line);});}
 function applyBulk(){const rows=parsedBulk().filter(r=>r.valid);if(!rows.length)return previewBulk();const sentenceTab=document.getElementById('sw-sent').classList.contains('active');rows.forEach(r=>sentenceTab?ownedSents.push({en:r.en,ko:r.ko}):ownedWords.push({word:r.en,meaning:r.ko}));words=ownedWords;sents=ownedSents;rebuildCatalog();LS.save();renderWordList();renderSentList();document.getElementById('bulk-input').value='';document.getElementById('bulk-preview').textContent=`${rows.length}개를 학습 목록에 등록했습니다.`;}
-function exportData(){const envelope=VocabCore.exportEnvelope(catalog,{progress:progressById,events:studyEvents},selection),blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`vocabmaster-${VocabCore.localDate()}.json`;a.click();URL.revokeObjectURL(a.href);}
-async function importData(file){const out=document.getElementById('import-report');if(!file)return;const text=await file.text(),report=VocabCore.inspectImport(text,catalog);out.textContent=report.valid?`신규 ${report.newCount} · 중복 ${report.duplicateCount} · 충돌 ${report.conflictCount} · 무효 ${report.invalidCount}`:report.error;if(!report.valid||!confirm(out.textContent+'\n이 백업을 병합할까요?'))return;(report.data.items||[]).forEach(item=>{if(catalog.items.some(i=>i.id===item.id))return;const sources=(report.data.memberships||[]).filter(m=>m.itemId===item.id).map(m=>m.sourceId);if(sources.includes('mine_words'))ownedWords.push({word:item.en,meaning:item.ko});if(sources.includes('mine_sentences'))ownedSents.push({en:item.en,ko:item.ko});});(report.data.progress||[]).forEach(p=>{progressById[p.itemId]=p;});studyEvents=[...studyEvents,...(report.data.events||[]).filter(e=>!studyEvents.some(old=>old.id===e.id))];rebuildCatalog();LS.save();persistV2();renderWordList();renderSentList();out.textContent+=' · 적용 완료';}
+function exportData(){const json=repository.exportJson(catalog,{progress:progressById,events:studyEvents,selection}),blob=new Blob([json],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`vocabmaster-${VocabCore.localDate()}.json`;a.click();URL.revokeObjectURL(a.href);}
+async function importData(file){const out=document.getElementById('import-report');if(!file)return;const text=await file.text(),report=repository.previewImport(text,catalog);out.textContent=report.valid?`신규 ${report.newCount} · 중복 ${report.duplicateCount} · 충돌 ${report.conflictCount} · 무효 ${report.invalidCount}`:report.error;if(!report.valid||!confirm(out.textContent+'\n이 백업을 병합할까요?'))return;(report.data.items||[]).forEach(item=>{if(catalog.items.some(i=>i.id===item.id))return;const sources=(report.data.memberships||[]).filter(m=>m.itemId===item.id).map(m=>m.sourceId);if(sources.includes('mine_words'))ownedWords.push({word:item.en,meaning:item.ko});if(sources.includes('mine_sentences'))ownedSents.push({en:item.en,ko:item.ko});});rebuildCatalog();const snapshot=repository.applyImport(report,catalog);progressById=snapshot.progress;studyEvents=snapshot.events;selection=snapshot.selection||selection;LS.save();renderWordList();renderSentList();out.textContent+=' · 적용 완료';}
 
+function editWord(index){const word=ownedWords[index],oldItem=currentItem('word',word.word,word.meaning),en=prompt('영어 단어를 수정하세요.',word.word);if(en===null)return;const ko=prompt('뜻을 수정하세요.',word.meaning);if(ko===null||!en.trim()||!ko.trim())return;ownedWords[index]={word:en.trim(),meaning:ko.trim()};rebuildCatalog();const next=currentItem('word',en,ko);if(oldItem&&next&&progressById[oldItem.id]&&!progressById[next.id]){progressById[next.id]=progressById[oldItem.id];delete progressById[oldItem.id];}LS.save();persistV2();renderWordList();}
+function editSent(index){const sentence=ownedSents[index],oldItem=currentItem('sentence',sentence.en,sentence.ko),en=prompt('영어 문장을 수정하세요.',sentence.en);if(en===null)return;const ko=prompt('한국어 뜻을 수정하세요.',sentence.ko);if(ko===null||!en.trim()||!ko.trim())return;ownedSents[index]={en:en.trim(),ko:ko.trim()};rebuildCatalog();const next=currentItem('sentence',en,ko);if(oldItem&&next&&progressById[oldItem.id]&&!progressById[next.id]){progressById[next.id]=progressById[oldItem.id];delete progressById[oldItem.id];}LS.save();persistV2();renderSentList();}
+function actionButton(label,className,handler){const button=document.createElement('button');button.className=className;button.textContent=label;button.type='button';button.addEventListener('click',handler);return button;}
 /* User-owned text is always inserted as text, never parsed as markup. */
-function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=ownedWords.length===0;el.replaceChildren();if(!ownedWords.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='단어를 추가하면 AI 이미지 연상법을 만들어줘요 ✨';el.append(empty);return;}ownedWords.forEach((word,index)=>{const row=document.createElement('div');row.className='wi';const en=document.createElement('span');en.className='wd';en.textContent=word.word;const ko=document.createElement('span');ko.className='mn';ko.textContent=word.meaning;row.append(en,ko);const item=currentItem('word',word.word,word.meaning),lapses=item?progressById[item.id]?.lapses:0;if(lapses){const badge=document.createElement('span');badge.className='err-badge';badge.textContent=`오답 ${lapses}회`;row.append(badge);}const button=document.createElement('button');button.className='del-btn';button.textContent='×';button.setAttribute('aria-label',`${word.word} 삭제`);button.addEventListener('click',()=>delWord(index));row.append(button);el.append(row);});}
-function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=ownedSents.length===0;el.replaceChildren();if(!ownedSents.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='문장을 추가해 학습해요 ✨';el.append(empty);return;}ownedSents.forEach((sentence,index)=>{const row=document.createElement('div');row.className='wi swi';const texts=document.createElement('div');texts.className='swi-texts';const en=document.createElement('div');en.className='sent-en';en.textContent=sentence.en;const ko=document.createElement('div');ko.className='sent-ko';ko.textContent=sentence.ko;texts.append(en,ko);const button=document.createElement('button');button.className='del-btn';button.textContent='×';button.setAttribute('aria-label','문장 삭제');button.addEventListener('click',()=>delSent(index));row.append(texts,button);el.append(row);});}
+function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=ownedWords.length===0;el.replaceChildren();if(!ownedWords.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='단어를 추가하면 AI 이미지 연상법을 만들어줘요 ✨';el.append(empty);return;}ownedWords.forEach((word,index)=>{const row=document.createElement('div');row.className='wi';const en=document.createElement('span');en.className='wd';en.textContent=word.word;const ko=document.createElement('span');ko.className='mn';ko.textContent=word.meaning;row.append(en,ko);const item=currentItem('word',word.word,word.meaning),lapses=item?progressById[item.id]?.lapses:0;if(lapses){const badge=document.createElement('span');badge.className='err-badge';badge.textContent=`오답 ${lapses}회`;row.append(badge);}row.append(actionButton('수정','edit-btn',()=>editWord(index)),actionButton('×','del-btn',()=>delWord(index)));el.append(row);});}
+function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=ownedSents.length===0;el.replaceChildren();if(!ownedSents.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='문장을 추가해 학습해요 ✨';el.append(empty);return;}ownedSents.forEach((sentence,index)=>{const row=document.createElement('div');row.className='wi swi';const texts=document.createElement('div');texts.className='swi-texts';const en=document.createElement('div');en.className='sent-en';en.textContent=sentence.en;const ko=document.createElement('div');ko.className='sent-ko';ko.textContent=sentence.ko;texts.append(en,ko);row.append(texts,actionButton('수정','edit-btn',()=>editSent(index)),actionButton('×','del-btn',()=>delSent(index)));el.append(row);});}

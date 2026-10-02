@@ -2,7 +2,7 @@
 
 > **용도:** 1차 개발 요청 이후 남은 작업을 빠짐없이 전달하는 최종 개발 요청서
 >
-> **기준 문서:** `docs/voca-design-v3.md`, `docs/development-request.md`, `docs/storage-schema-v2.md`
+> **기준 문서:** `docs/voca-design-v3.md`, `docs/development-request.md`, `docs/vocabmaster-storage-contract.md`
 > **중요:** 이 문서는 “한 번에 전부 배포”하라는 뜻이 아니다. 아래 Gate 순서대로 작은 PR로 구현하고 각 Gate를 통과한 뒤 다음 단계로 진행한다.
 
 ## 1. 요청 목적
@@ -19,7 +19,7 @@
 - 숫자는 공통 selector에서만 계산한다.
 - 기존 `vm-*` 백업과 v2 마이그레이션이 테스트된다.
 - 단어 Source에서 문장 전용 모드가 실행되지 않는다.
-- 저장과 UI가 `docs/storage-schema-v2.md` 계약을 따른다.
+- 저장과 UI가 `docs/vocabmaster-storage-contract.md` 계약을 따른다.
 
 ## 3. 전체 납품 범위
 

@@ -20,12 +20,12 @@ function boot(initial={}){
 
 test('앱 초기화와 주요 버튼 핸들러가 런타임 오류 없이 동작한다',()=>{
   const {context,elements,localStorage}=boot();
-  context.document.getElementById('profileGoal').value='daily';context.document.getElementById('profileMinutes').value='10';context.document.getElementById('profileLevel').value='beginner';context.document.getElementById('profileInterests').value='여행, 면접';
+  context.document.getElementById('profileGoal').value='daily';context.document.getElementById('profileMinutes').value='10';context.document.getElementById('profileItemLimit').value='15';context.document.getElementById('profileLevel').value='beginner';context.document.getElementById('profileInterests').value='여행, 면접';
   assert.equal(context.document.getElementById('apiModal').style.display||'none','none');
   assert.equal(elements.get('onboardingModal').style.display,'flex');
   assert.doesNotThrow(()=>context.document.getElementById('onboardingForm').dispatchEvent({type:'submit',preventDefault(){}}));
   for(const source of ["go('input')","switchInputMode('sent')","go('learn')","startToday()","showApiModal()"])assert.doesNotThrow(()=>vm.runInContext(source,context),source);
-  const profile=JSON.parse(localStorage.getItem('vm-profile-v2'));assert.deepEqual({goal:profile.goal,dailyMinutes:profile.dailyMinutes,level:profile.level,interests:Array.from(profile.interests)},{goal:'daily',dailyMinutes:10,level:'beginner',interests:['여행','면접']});
+  const profile=JSON.parse(localStorage.getItem('vm-profile-v2'));assert.deepEqual({goal:profile.goal,dailyMinutes:profile.dailyMinutes,dailyItemLimit:profile.dailyItemLimit,level:profile.level,interests:Array.from(profile.interests)},{goal:'daily',dailyMinutes:10,dailyItemLimit:15,level:'beginner',interests:['여행','면접']});
   assert.equal(elements.get('onboardingModal').style.display,'none');
   const html=fs.readFileSync('index.html','utf8'),handlers=[...html.matchAll(/onclick="([A-Za-z_$][\w$]*)\s*\(/g)].map(match=>match[1]);
   for(const handler of new Set(handlers))assert.equal(vm.runInContext(`typeof ${handler}`,context),'function',`${handler} 버튼 핸들러`);

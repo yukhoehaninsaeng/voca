@@ -99,6 +99,7 @@ test('오늘 계획은 재현 가능하고 상한과 5분 규칙을 지킨다',(
   const input={catalog,progress,profile:{dailyMinutes:15},localDate:'2026-10-02',timezone:'Asia/Seoul',seed:'fixed'};
   const first=Core.createDailyPlan(input),second=Core.createDailyPlan(input);assert.deepEqual(first,second);assert.equal(first.counts.review,10);assert.equal(first.counts.new,0);assert.equal(first.remainingReviewCount,90);
   const short=Core.createDailyPlan({...input,budgetMinutes:5});assert.equal(short.counts.review,5);assert.equal(short.counts.new,0);
+  const twenty=Core.createDailyPlan({...input,progress:{},profile:{dailyMinutes:15,dailyItemLimit:20}});assert.equal(twenty.steps.length,20);assert.equal(twenty.counts.new,20);assert.equal(twenty.itemLimit,20);
 });
 
 test('세션 복구와 attemptId 멱등 제출이 동작한다',()=>{

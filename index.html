@@ -18,6 +18,7 @@
     <h2>나에게 맞는 오늘 학습</h2><p>진단 없이도 바로 시작할 수 있고 설정은 나중에 바꿀 수 있어요.</p>
     <label class="field-label">목표<select id="profileGoal"><option value="both">일상 회화 + 토익스피킹</option><option value="daily">일상 회화</option><option value="toeic">토익스피킹</option></select></label>
     <label class="field-label">하루 시간<select id="profileMinutes"><option value="15">15분</option><option value="10">10분</option><option value="5">5분</option></select></label>
+    <label class="field-label">하루 학습 단어<select id="profileItemLimit"><option value="5">5개</option><option value="10" selected>10개</option><option value="15">15개</option><option value="20">20개</option></select></label>
     <label class="field-label">수준<select id="profileLevel"><option value="unknown">잘 모르겠어요</option><option value="beginner">초급</option><option value="intermediate">중급</option></select></label>
     <label class="field-label">관심 주제 (선택)<input id="profileInterests" placeholder="여행, 면접"/></label>
     <div id="onboardingError" class="form-error" role="alert" aria-live="polite"></div>
@@ -108,6 +109,7 @@
       <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
       <p id="today-duration">오늘 약 0분</p>
       <div class="today-counts" id="today-counts">복습 0개 / 새 표현 0개</div>
+      <label class="today-limit">오늘 공부할 개수<select id="todayItemLimit" onchange="changeTodayItemLimit(this.value)"><option value="5">5개</option><option value="10">10개</option><option value="15">15개</option><option value="20">20개</option></select></label>
       <button class="btn primary btn-wide today-primary" id="auto-start" onclick="startToday()">오늘 학습 시작</button>
       <button class="btn btn-wide" onclick="startToday(5)">오늘은 5분만</button>
       <details><summary>추천 이유</summary><div id="today-reasons"></div></details>

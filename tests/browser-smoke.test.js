@@ -4,8 +4,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 
 class Element {
-  constructor(id=''){this.id=id;this.style={};this.value='';this.textContent='';this.innerHTML='';this.disabled=false;this.dataset={};this.children=[];this.offsetWidth=340;this.offsetHeight=120;this.classList={add(){},remove(){},toggle(){},contains(){return false;}};}
-  addEventListener(){} append(...children){this.children.push(...children);} appendChild(child){this.children.push(child);} replaceChildren(...children){this.children=children;} focus(){} click(){}
+  constructor(id=''){this.id=id;this.style={};this.value='';this.textContent='';this.innerHTML='';this.disabled=false;this.dataset={};this.children=[];this.offsetWidth=340;this.offsetHeight=120;this.listeners={};this.classList={add(){},remove(){},toggle(){},contains(){return false;}};}
+  addEventListener(type,handler){(this.listeners[type]??=[]).push(handler);} dispatchEvent(event){event.preventDefault??=()=>{};for(const handler of this.listeners[event.type]||[])handler(event);return true;} append(...children){this.children.push(...children);} appendChild(child){this.children.push(child);} replaceChildren(...children){this.children=children;} focus(){} click(){}
   getContext(){return new Proxy({createLinearGradient:()=>({addColorStop(){}})},{get:(target,key)=>target[key]||(()=>{})});}
 }
 function boot(){
@@ -19,10 +19,14 @@ function boot(){
 }
 
 test('앱 초기화와 주요 버튼 핸들러가 런타임 오류 없이 동작한다',()=>{
-  const {context,elements}=boot();
+  const {context,elements,localStorage}=boot();
+  context.document.getElementById('profileGoal').value='daily';context.document.getElementById('profileMinutes').value='10';context.document.getElementById('profileLevel').value='beginner';context.document.getElementById('profileInterests').value='여행, 면접';
   assert.equal(elements.get('apiModal').style.display,'none');
   assert.equal(elements.get('onboardingModal').style.display,'flex');
-  for(const source of ["finishOnboarding({preventDefault(){}})","go('input')","switchInputMode('sent')","go('learn')","startToday()","showApiModal()"])assert.doesNotThrow(()=>vm.runInContext(source,context),source);
+  assert.doesNotThrow(()=>context.document.getElementById('onboardingForm').dispatchEvent({type:'submit',preventDefault(){}}));
+  for(const source of ["go('input')","switchInputMode('sent')","go('learn')","startToday()","showApiModal()"])assert.doesNotThrow(()=>vm.runInContext(source,context),source);
+  const profile=JSON.parse(localStorage.getItem('vm-profile-v2'));assert.deepEqual({goal:profile.goal,dailyMinutes:profile.dailyMinutes,level:profile.level,interests:Array.from(profile.interests)},{goal:'daily',dailyMinutes:10,level:'beginner',interests:['여행','면접']});
+  assert.equal(elements.get('onboardingModal').style.display,'none');
   const html=fs.readFileSync('index.html','utf8'),handlers=[...html.matchAll(/onclick="([A-Za-z_$][\w$]*)\s*\(/g)].map(match=>match[1]);
   for(const handler of new Set(handlers))assert.equal(vm.runInContext(`typeof ${handler}`,context),'function',`${handler} 버튼 핸들러`);
 });

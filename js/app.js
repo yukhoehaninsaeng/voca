@@ -51,14 +51,14 @@ try {
   VocabCore.migrationReport(localStorage,catalog,{words:ownedWords,sents:ownedSents,errCount,sErrCount});
   const snapshot=repository.loadSnapshot();
   progressById={...catalog.seedProgress,...snapshot.progress};
-  studyEvents=snapshot.events;
-  selection=snapshot.selection||selection;
+  studyEvents=Array.isArray(snapshot.events)?snapshot.events:[];
+  if(snapshot.selection&&Array.isArray(snapshot.selection.sourceIds))selection={...selection,...snapshot.selection};
   userProfile=snapshot.profile;
   dailyPlan=snapshot.plan;
   dailySession=snapshot.session;
 } catch(e) { setTimeout(()=>alert('데이터 마이그레이션을 완료하지 못했습니다. 기존 백업은 보존되었습니다: '+e.message),0); }
 function rebuildCatalog(){catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});}
-function persistV2(){repository.saveSnapshot({progress:progressById,events:studyEvents,selection,profile:userProfile,plan:dailyPlan,session:dailySession});}
+function persistV2(){try{repository.saveSnapshot({progress:progressById,events:studyEvents,selection,profile:userProfile,plan:dailyPlan,session:dailySession});return true;}catch(error){console.error('학습 상태 저장 실패',error);return false;}}
 function currentItem(type,en,ko){return catalog.items.find(i=>i.type===type&&i.normalizedEn===VocabCore.normalize(en)&&i.normalizedKo===VocabCore.normalize(ko));}
 function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds,itemId=null){const item=itemId?catalog.items.find(candidate=>candidate.id===itemId):currentItem(type,en,ko);if(!item)return;const task=dailySession?.steps?.find(step=>step.itemId===item.id&&!dailySession.results[`${dailySession.sessionId}:${step.taskId}`]),attemptId=task?`${dailySession.sessionId}:${task.taskId}`:null,event=VocabCore.recordStudyEvent({progress:progressById,events:studyEvents},{itemId:item.id,sourceIds,mode,correct,attemptId,taskType:task?.taskType,skill:task?.skill,sessionId:dailySession?.sessionId||'web'});if(task)VocabCore.submitSessionAttempt(dailySession,{taskId:task.taskId,attemptId,eventId:event.id});persistV2();}
 
@@ -1000,7 +1000,24 @@ function ensureTodayPlan(minutes){
 }
 function renderTodayPlan(){const plan=ensureTodayPlan();const minutes=Math.max(1,Math.ceil(plan.estimatedSeconds/60));document.getElementById('today-duration').textContent=`오늘 약 ${minutes}분`;document.getElementById('today-counts').textContent=`복습 ${plan.counts.review}개 / 새 표현 ${plan.counts.new}개${plan.remainingReviewCount?` / 추가 복습 ${plan.remainingReviewCount}개`:''}`;document.getElementById('today-reasons').textContent=[...new Set(plan.steps.map(step=>step.reason))].join(' · ')||'학습 항목을 보관함에 추가하면 자동으로 계획해요.';const button=document.getElementById('auto-start');button.textContent=dailySession&&!dailySession.completed&&dailySession.cursor>0?'이어하기':'오늘 학습 시작';button.disabled=!plan.steps.length;}
 function startToday(minutes){const plan=ensureTodayPlan(minutes),completed=new Set(Object.values(dailySession.results||{}).map(result=>result.taskId)),remaining=plan.steps.filter(step=>!completed.has(step.taskId));if(!remaining.length){dailySession.completed=true;persistV2();renderTodayPlan();return;}const mode=remaining[0].mode,ids=new Set(remaining.filter(step=>step.mode===mode).map(step=>step.itemId)),items=catalog.items.filter(item=>ids.has(item.id));selection={...selection,sourceIds:catalog.sources.filter(source=>source.kind!=='virtual').map(source=>source.id),mode};selectedStudyItems=items;persistV2();if(['flash','type'].includes(mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount={};go(mode);return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount={};setSentModeAndGo(mode,'user');}
-function finishOnboarding(event){event.preventDefault();const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;userProfile={goal:document.getElementById('profileGoal').value,dailyMinutes:Number(document.getElementById('profileMinutes').value),level:document.getElementById('profileLevel').value,interests:document.getElementById('profileInterests').value.split(',').map(value=>value.trim()).filter(Boolean),timezone,createdAt:Date.now()};dailyPlan=null;dailySession=null;document.getElementById('onboardingModal').style.display='none';persistV2();go('learn');}
+function finishOnboarding(event){
+  event?.preventDefault();
+  const error=document.getElementById('onboardingError'),button=document.getElementById('onboardingNext');
+  if(error)error.textContent='';if(button)button.disabled=true;
+  try{
+    const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC';
+    userProfile={goal:document.getElementById('profileGoal').value||'both',dailyMinutes:Number(document.getElementById('profileMinutes').value)||15,level:document.getElementById('profileLevel').value||'unknown',interests:document.getElementById('profileInterests').value.split(',').map(value=>value.trim()).filter(Boolean),timezone,createdAt:Date.now()};
+    dailyPlan=null;dailySession=null;
+    document.getElementById('onboardingModal').style.display='none';
+    persistV2();go('learn');
+  }catch(cause){
+    console.error('온보딩 완료 실패',cause);
+    if(error)error.textContent='화면을 여는 중 문제가 생겼어요. 새로고침 후 다시 시도해주세요.';
+    document.getElementById('onboardingModal').style.display='flex';
+  }finally{if(button)button.disabled=false;}
+  return false;
+}
+document.getElementById('onboardingForm')?.addEventListener('submit',finishOnboarding);
 function toggleSource(id,checked){const set=new Set(selection.sourceIds);checked?set.add(id):set.delete(id);selection={...selection,sourceIds:[...set],updatedAt:Date.now()};persistV2();renderSelection();}
 function startSelectedMode(){const items=VocabCore.compatibleItems(VocabCore.selectItems(selection.sourceIds,catalog,progressById),selection.mode);if(!items.length)return;selectedStudyItems=items;if(['flash','quiz','type'].includes(selection.mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));if(selection.mode==='flash')go('flash');else if(selection.mode==='quiz')go('quiz');else go('type');return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));selectedPart=null;selectedCustom=null;if(selection.mode==='speak'){voiceSource='user';go('voice');}else setSentModeAndGo(selection.mode,'user');}
 function filterLibrary(query){const q=VocabCore.normalize(query);document.querySelectorAll('#wlist .wi,#slist .wi').forEach(row=>{row.style.display=!q||VocabCore.normalize(row.textContent).includes(q)?'':'none';});}

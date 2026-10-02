@@ -84,9 +84,6 @@ async function getAI(){return{scene:'',memory:'',sentence:''};}
 const escapeHtml=VocabCore.escapeHtml;
 function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
 
-const escapeHtml=VocabCore.escapeHtml;
-function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
-
 /* ─── WORD LIST ──────────────────────────────────────── */
 function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;ownedWords.push({word:w,meaning:m});words=ownedWords;wi.value='';mi.value='';rebuildCatalog();renderWordList();wi.focus();LS.save();}
 function delWord(i){ownedWords.splice(i,1);words=ownedWords;delete errCount[i];rebuildCatalog();renderWordList();LS.save();persistV2();}
@@ -210,8 +207,9 @@ function go(tab){
   document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['learn','input'][i]===tab));
   document.querySelectorAll('.tnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn'][i]===tab));
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
-  document.getElementById('s-'+tab).classList.add('on');
-  window.scrollTo({top:0,behavior:'smooth'});
+  const target=document.getElementById('s-'+tab);if(!target)return;
+  target.classList.add('on');
+  if(typeof window.scrollTo==='function')window.scrollTo({top:0,behavior:'smooth'});
   // 현재 탭 저장
   try{localStorage.setItem('vm-tab',tab);}catch(e){}
   if(tab==='learn')renderLearnScreen();
@@ -980,8 +978,8 @@ renderSentList();
     if(lastTab&&document.getElementById('s-'+lastTab)){
       go(safeRestore.includes(lastTab)?lastTab:'learn');
     }else go('learn');
-    if(!userProfile)document.getElementById('onboardingModal').style.display='flex';
-  }catch(e){}
+  }catch(error){console.error('초기 화면 복원 실패',error);}
+  finally{if(!userProfile)document.getElementById('onboardingModal').style.display='flex';}
 })();
 
 /* ─── V2 ITEM/SOURCE UI ─────────────────────────────── */
@@ -998,10 +996,10 @@ function ensureTodayPlan(minutes){
   const date=VocabCore.localDate(),timezone=Intl.DateTimeFormat().resolvedOptions().timeZone,profile=userProfile||{goal:'both',dailyMinutes:15,level:'unknown',interests:[],timezone};
   if(!dailyPlan||dailyPlan.localDate!==date||minutes&&dailyPlan.budgetMinutes!==minutes)dailyPlan=VocabCore.createDailyPlan({catalog,progress:progressById,profile,localDate:date,timezone,seed:date,budgetMinutes:minutes});
   if(!dailySession||dailySession.planId!==dailyPlan.planId)dailySession=VocabCore.createSession(dailyPlan);
-  persistV2();return dailyPlan;
+  return dailyPlan;
 }
 function renderTodayPlan(){const plan=ensureTodayPlan();const minutes=Math.max(1,Math.ceil(plan.estimatedSeconds/60));document.getElementById('today-duration').textContent=`오늘 약 ${minutes}분`;document.getElementById('today-counts').textContent=`복습 ${plan.counts.review}개 / 새 표현 ${plan.counts.new}개${plan.remainingReviewCount?` / 추가 복습 ${plan.remainingReviewCount}개`:''}`;document.getElementById('today-reasons').textContent=[...new Set(plan.steps.map(step=>step.reason))].join(' · ')||'학습 항목을 보관함에 추가하면 자동으로 계획해요.';const button=document.getElementById('auto-start');button.textContent=dailySession&&!dailySession.completed&&dailySession.cursor>0?'이어하기':'오늘 학습 시작';button.disabled=!plan.steps.length;}
-function startToday(minutes){const plan=ensureTodayPlan(minutes),remaining=plan.steps.slice(dailySession.cursor);if(!remaining.length){renderTodayPlan();return;}const mode=remaining[0].mode,ids=new Set(remaining.filter(step=>step.mode===mode).map(step=>step.itemId)),items=catalog.items.filter(item=>ids.has(item.id));selection={...selection,sourceIds:catalog.sources.filter(source=>source.kind!=='virtual').map(source=>source.id),mode};selectedStudyItems=items;persistV2();if(['flash','type'].includes(mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount={};go(mode);return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount={};setSentModeAndGo(mode,'user');}
+function startToday(minutes){const plan=ensureTodayPlan(minutes),completed=new Set(Object.values(dailySession.results||{}).map(result=>result.taskId)),remaining=plan.steps.filter(step=>!completed.has(step.taskId));if(!remaining.length){dailySession.completed=true;persistV2();renderTodayPlan();return;}const mode=remaining[0].mode,ids=new Set(remaining.filter(step=>step.mode===mode).map(step=>step.itemId)),items=catalog.items.filter(item=>ids.has(item.id));selection={...selection,sourceIds:catalog.sources.filter(source=>source.kind!=='virtual').map(source=>source.id),mode};selectedStudyItems=items;persistV2();if(['flash','type'].includes(mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount={};go(mode);return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount={};setSentModeAndGo(mode,'user');}
 function finishOnboarding(event){event.preventDefault();const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;userProfile={goal:document.getElementById('profileGoal').value,dailyMinutes:Number(document.getElementById('profileMinutes').value),level:document.getElementById('profileLevel').value,interests:document.getElementById('profileInterests').value.split(',').map(value=>value.trim()).filter(Boolean),timezone,createdAt:Date.now()};dailyPlan=null;dailySession=null;document.getElementById('onboardingModal').style.display='none';persistV2();go('learn');}
 function toggleSource(id,checked){const set=new Set(selection.sourceIds);checked?set.add(id):set.delete(id);selection={...selection,sourceIds:[...set],updatedAt:Date.now()};persistV2();renderSelection();}
 function startSelectedMode(){const items=VocabCore.compatibleItems(VocabCore.selectItems(selection.sourceIds,catalog,progressById),selection.mode);if(!items.length)return;selectedStudyItems=items;if(['flash','quiz','type'].includes(selection.mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));if(selection.mode==='flash')go('flash');else if(selection.mode==='quiz')go('quiz');else go('type');return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount=Object.fromEntries(items.map((item,index)=>[index,progressById[item.id]?.lapses||0]));selectedPart=null;selectedCustom=null;if(selection.mode==='speak'){voiceSource='user';go('voice');}else setSentModeAndGo(selection.mode,'user');}

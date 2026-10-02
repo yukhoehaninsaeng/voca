@@ -97,6 +97,9 @@ async function getAI(word,meaning){
 
 const escapeHtml=VocabCore.escapeHtml;
 function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
+function speakEnglish(text,event){event?.stopPropagation();if(!('speechSynthesis'in window)||typeof SpeechSynthesisUtterance==='undefined'){alert('이 브라우저에서는 영어 발음 재생을 지원하지 않아요.');return false;}window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(String(text||''));utterance.lang='en-US';utterance.rate=.85;const voice=window.speechSynthesis.getVoices?.().find(candidate=>candidate.lang?.toLowerCase().startsWith('en-us'))||window.speechSynthesis.getVoices?.().find(candidate=>candidate.lang?.toLowerCase().startsWith('en'));if(voice)utterance.voice=voice;window.speechSynthesis.speak(utterance);return true;}
+function pronunciationButton(text,label='발음 듣기'){return`<button type="button" class="pronounce-btn" onclick="speakEnglish(${escapeHtml(JSON.stringify(String(text||'')))},event)">🔊 ${escapeHtml(label)}</button>`;}
+function appendPronunciationButton(container,text,label){if(!container||!text)return;const button=document.createElement('button');button.type='button';button.className='pronounce-btn';button.textContent=`🔊 ${label}`;button.addEventListener('click',event=>speakEnglish(text,event));container.append(button);}
 
 /* ─── WORD LIST ──────────────────────────────────────── */
 function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;ownedWords.push({word:w,meaning:m});words=ownedWords;wi.value='';mi.value='';rebuildCatalog();renderWordList();wi.focus();LS.save();}
@@ -327,7 +330,7 @@ function showFlash(){
     return;
   }
   const wi=fQueue[fIdx],w=words[wi],pal=palette(wi),isR=(errCount[wi]||0)>0;fFlipped=false;
-  document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${escapeHtml(w.word)}</div><div class="mem-meaning">${escapeHtml(w.meaning)}</div><div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
+  document.getElementById('flash-body').innerHTML=`<div class="mem-card" id="fcard" onclick="flipFlash(${wi})"><div class="mem-scene"><canvas id="fcanvas"></canvas></div><div class="mem-body">${isR?'<div class="ai-label repeat-lbl" style="margin-bottom:.5rem">🔁 복습 중</div>':''}<div class="mem-word" id="fword" style="filter:blur(6px)">${escapeHtml(w.word)}</div><div class="mem-meaning">${escapeHtml(w.meaning)}</div>${pronunciationButton(w.word)}<div class="mem-reveal" id="freveal"><div id="fai-content"><div class="ai-loading">AI 연상법 생성 중</div></div></div><div class="tap-hint" id="ftap">탭하여 단어 확인 👆</div></div></div><div class="fc-btns"><button class="fc-btn dunno" onclick="markFlash(${wi},false)">😅 모르겠어요</button><button class="fc-btn know" onclick="markFlash(${wi},true)">✅ 알아요!</button></div><div class="ctr-line">${fIdx+1} / ${fQueue.length}</div>`;
   setTimeout(()=>{const c=document.getElementById('fcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},50);
 }
 function reviewFlash(){
@@ -336,7 +339,7 @@ function reviewFlash(){
   fQueue=wrongIdxs.sort(()=>Math.random()-.5);fIdx=0;fKnow=0;fDunno=0;
   repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();
 }
-async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;const sentence=(ai.sentence||'').split('|').map(value=>value.trim()).filter(Boolean).join(' / ');renderAiText(el,[{label:'🖼 이미지 연상',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory},{label:'📖 예문',className:'ex-lbl',text:sentence}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';}
+async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;const sentenceParts=(ai.sentence||'').split('|').map(value=>value.trim()).filter(Boolean),sentence=sentenceParts.join(' / ');renderAiText(el,[{label:'🖼 이미지 연상',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory},{label:'📖 예문',className:'ex-lbl',text:sentence}]);appendPronunciationButton(el,sentenceParts[0],'예문 듣기');if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';}
 function markFlash(wi,know){const studied=words[wi];recordResult(studied._itemType||'word',studied.word,studied.meaning,'flash',know,selection.sourceIds,studied._itemId);if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
 
 /* ─── QUIZ ───────────────────────────────────────────── */
@@ -367,7 +370,7 @@ function showQuiz(){
   const wi=qQueue[qIdx],correct=words[wi],isR=(errCount[wi]||0)>0;
   const others=words.filter((_,i)=>i!==wi).sort(()=>Math.random()-.5).slice(0,3);
   const opts=[...others,correct].sort(()=>Math.random()-.5);qAnswered=false;
-  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${escapeHtml(correct.word)}</div><div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts" id="qopts"></div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
+  document.getElementById('quiz-body').innerHTML=`<div class="qword-card">${isR?'<div class="repeat-tag">🔁 복습</div>':''}<div class="qword">${escapeHtml(correct.word)}</div>${pronunciationButton(correct.word)}<div class="qsub">알맞은 뜻을 고르세요</div></div><div class="qopts" id="qopts"></div><div class="feedback-box" id="qfb"></div><button class="btn btn-wide" id="qnext" style="display:none;margin-top:.25rem" onclick="nextQuiz()">다음 문제 → <span style="font-size:.65rem;opacity:.55">Enter</span></button>`;
   const optionHost=document.getElementById('qopts');opts.forEach(option=>{const button=document.createElement('button');button.className='qopt';button.dataset.meaning=option.meaning;button.textContent=option.meaning;button.addEventListener('click',()=>answerQuiz(button,option.meaning,correct.meaning,wi));optionHost.append(button);});
 }
 function reviewQuiz(){
@@ -385,7 +388,7 @@ async function answerQuiz(btn,chosen,correct,wi){
   updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();
   const fb=document.getElementById('qfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
   const w=words[wi],pal=palette(wi);
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(correct)}</strong>`}</div><div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(correct)}</strong>`}</div>${pronunciationButton(w.word)}<div class="fb-scene"><canvas id="qfbcanvas"></canvas></div><div id="qfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('qfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('qfbai');if(!el)return;
   renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';
@@ -437,7 +440,7 @@ async function checkType(wi){
   updateTStats();repeatBanner('t-rq-banner','t-repeat',errCount);renderWordList();LS.save();
   const fb=document.getElementById('tfb');fb.className='feedback-box '+(ok?'ok':'ng');fb.style.display='block';
   const pal=palette(wi);
-  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(w.word)}</strong> (${escapeHtml(w.meaning)})`}</div><div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
+  fb.innerHTML=`<div class="fb-top ${ok?'ok':'ng'}">${ok?'🎉 정답이에요!':`❌ 틀렸어요. 정답: <strong>${escapeHtml(w.word)}</strong> (${escapeHtml(w.meaning)})`}</div>${pronunciationButton(w.word)}<div class="fb-scene"><canvas id="tfbcanvas"></canvas></div><div id="tfbai"><div class="ai-loading">AI 연상법 로딩 중</div></div>`;
   setTimeout(()=>{const c=document.getElementById('tfbcanvas');if(c)drawScene(c,w.word,w.meaning,pal);},30);
   const ai=await getAI(w.word,w.meaning);const el=document.getElementById('tfbai');if(!el)return;
   renderAiText(el,[{label:'🖼 연상 장면',className:'mem-lbl',text:ai.scene},{label:'💡 기억법',className:'mem-lbl2',text:ai.memory}]);if(!el.childElementCount)el.textContent=ai.error||'AI 연상법을 표시하지 못했어요.';

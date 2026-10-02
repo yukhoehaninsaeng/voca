@@ -48,3 +48,10 @@ test('API 키 저장 후 AI 연상법을 요청하고 의미별로 캐시한다'
   assert.equal(first.scene,'공원 장면');assert.equal(second.memory,'산책을 떠올려요');assert.equal(calls,1);assert.ok(localStorage.getItem('vm-ai-cache-v2'));
   const restored=boot({'vm-apikey':'persisted','vm-ai-model':'test-model'});assert.equal(restored.elements.get('apiStatus').textContent,'AI ON');
 });
+
+test('영어 발음 버튼은 en-US 음성을 선택해 재생한다',()=>{
+  const {context}=boot();let spoken=null,cancelled=false;
+  context.speechSynthesis={cancel(){cancelled=true;},getVoices(){return[{name:'Korean',lang:'ko-KR'},{name:'English',lang:'en-US'}];},speak(value){spoken=value;}};
+  context.SpeechSynthesisUtterance=function(text){this.text=text;};
+  assert.equal(vm.runInContext("speakEnglish('schedule')",context),true);assert.equal(cancelled,true);assert.equal(spoken.text,'schedule');assert.equal(spoken.lang,'en-US');assert.equal(spoken.rate,.85);assert.equal(spoken.voice.name,'English');
+});

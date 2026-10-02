@@ -404,3 +404,7 @@ body.light .btn-theme .icon-moon{opacity:0;transform:scale(.5) rotate(90deg);}
 #learn-word-section,#learn-sent-section,#learn-toeic-section,#learn-voice-section{display:none!important}
 .edit-btn{border:0;background:transparent;color:var(--accent);font-size:.68rem;font-weight:800;cursor:pointer;padding:.3rem}.wi .del-btn{position:static;margin-left:.1rem}.swi{display:flex;align-items:center;gap:.35rem}.swi .swi-texts{flex:1;min-width:0}
 .preview-valid{color:var(--text2);padding:.2rem 0}.preview-invalid{color:var(--red);padding:.2rem 0}
+
+/* Gate 1: today-first experience */
+.today-card{background:linear-gradient(145deg,rgba(124,106,247,.18),var(--bg2));border:1px solid rgba(124,106,247,.35);border-radius:22px;padding:1.25rem;margin-bottom:1rem;box-shadow:var(--sh)}
+.today-card h1{font-size:1.55rem;margin:.15rem 0}.today-kicker{font-size:.65rem;letter-spacing:.14em;font-weight:900;color:var(--accent)}.today-card p{color:var(--text2);font-weight:700;margin:.25rem 0}.today-counts{font-size:.82rem;font-weight:800;margin:.8rem 0 1rem}.today-primary{min-height:56px;font-size:1rem;margin-bottom:.55rem}.today-card details{margin-top:.8rem;color:var(--text3);font-size:.72rem}.today-card summary{cursor:pointer;font-weight:800}.today-card details div{margin-top:.4rem}.field-label{display:block;font-size:.75rem;font-weight:800;color:var(--text2);margin:.75rem 0}.field-label select,.field-label input{display:block;width:100%;margin-top:.35rem;padding:11px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font:inherit}

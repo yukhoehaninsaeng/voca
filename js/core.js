@@ -7,6 +7,8 @@
 
   const SCHEMA_VERSION=2;
   const DAY_MS=86400000;
+  const MAX_INTERVAL_DAYS=365;
+  const SKILLS=['recognition','recall','production','legacy'];
   const SOURCE_DEFS=[
     ['mine_words','내 단어','word','user'],
     ['mine_sentences','내 문장','sentence','user'],
@@ -93,6 +95,26 @@
   }
   function selectCounts(items,progressById={},now=Date.now()){
     const counts={total:items.length,fresh:0,due:0,learning:0,mastered:0};
+    items.forEach(item=>{const progress=progressFor(progressById,item.id);if(!progress||progress.state==='new')counts.fresh++;if(progress&&progress.dueAt<=now)counts.due++;if(progress&&(progress.state==='learning'||progress.state==='review'))counts.learning++;if(progress?.state==='mastered')counts.mastered++;});
+    return counts;
+  }
+  function progressKey(itemId,skill='recall'){return`${itemId}::${skill}`;}
+  function progressFor(progress,itemId,skill){
+    if(skill)return progress[progressKey(itemId,skill)]||progress[itemId];
+    return SKILLS.map(value=>progress[progressKey(itemId,value)]).find(Boolean)||progress[itemId];
+  }
+  function addLocalDays(local,days){const [y,m,d]=local.split('-').map(Number),date=new Date(Date.UTC(y,m-1,d+days));return date.toISOString().slice(0,10);}
+  function scheduleProgress(old={},rating,local=localDate(),options={}){
+    if(['skip','recognition_failed','grading_failed','cancelled'].includes(rating))return null;
+    const previous=Math.max(0,Number(old.intervalDays)||0),successes=Number(old.successes)||0;
+    let intervalDays=0;
+    if(rating==='hard')intervalDays=previous?Math.max(1,Math.round(previous*1.2)):1;
+    if(rating==='good')intervalDays=!previous?1:successes<2?3:Math.round(previous*2);
+    if(rating==='easy')intervalDays=previous?Math.max(4,Math.round(previous*2.5)):4;
+    intervalDays=Math.min(MAX_INTERVAL_DAYS,intervalDays);
+    const passed=rating!=='again',nextSuccesses=passed?successes+1:0;
+    return{...old,state:passed?(nextSuccesses>=5?'mastered':'review'):'learning',attempts:(old.attempts||old.reps||0)+1,reps:(old.reps||0)+1,lapses:(old.lapses||0)+(passed?0:1),successes:nextSuccesses,streak:passed?(old.streak||0)+1:0,intervalDays,dueDate:addLocalDays(local,intervalDays),dueAt:options.now==null?undefined:options.now+intervalDays*DAY_MS,lastRating:rating,lastHelped:Boolean(options.helped),lastReviewedAt:options.now};
+  }
     items.forEach(item=>{const progress=progressById[item.id];if(!progress||progress.state==='new')counts.fresh++;if(progress&&progress.state!=='mastered'&&progress.dueAt<=now)counts.due++;if(progress&&(progress.state==='learning'||progress.state==='review'))counts.learning++;if(progress?.state==='mastered')counts.mastered++;});
     return counts;
   }
@@ -106,6 +128,24 @@
   }
   function recordStudyEvent(state,input){
     if(!input.itemId||!MODE_RULES[input.mode])throw new Error('유효한 itemId와 mode가 필요합니다.');
+    const ts=input.ts??Date.now(),date=input.localDate||localDate(new Date(ts)),correct=input.correct??null,rating=input.rating||(correct===null?'skip':correct?'good':'again'),skill=input.skill||({quiz:'recognition',flash:'recognition',type:'recall',blank:'recall',full:'production',speak:'production'}[input.mode]),attemptId=input.attemptId||input.id;
+    if(attemptId){const duplicate=state.events.find(event=>event.attemptId===attemptId||event.id===attemptId);if(duplicate)return duplicate;}
+    const key=progressKey(input.itemId,skill),old=state.progress[key]||state.progress[input.itemId]||{state:'new',attempts:0,lapses:0,successes:0,intervalDays:0};
+    const updated=scheduleProgress(old,rating,date,{now:ts,helped:input.helped});if(updated)state.progress[key]=updated;
+    const event={id:input.id||`evt:${ts.toString(36)}:${stableHash(`${input.itemId}:${attemptId||Math.random()}`)}`,attemptId:attemptId||null,ts,localDate:date,timezone:input.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone,itemId:input.itemId,sourceIds:[...(input.sourceIds||[])],mode:input.mode,skill,taskType:input.taskType||input.mode,outcome:updated?(correct?'correct':'incorrect'):'neutral',rating,correct,helped:Boolean(input.helped),elapsedMs:input.elapsedMs,sessionId:input.sessionId||'legacy'};
+    state.events.push(event);return event;
+  }
+  function seededRank(seed,value){return stableHash(`${seed}:${value}`);}
+  function createDailyPlan({catalog,progress={},profile={},localDate:date=localDate(),timezone='UTC',seed=date,budgetMinutes}={}){
+    const minutes=budgetMinutes||profile.dailyMinutes||15,all=selectItems(catalog.sources.filter(source=>source.kind!=='virtual').map(source=>source.id),catalog,progress),seen=new Set(),unique=all.filter(item=>!seen.has(item.id)&&seen.add(item.id));
+    const entries=unique.map(item=>({item,p:progressFor(progress,item.id,'recall')})),due=entries.filter(x=>x.p&&((x.p.dueDate&&x.p.dueDate<=date)||(!x.p.dueDate&&x.p.dueAt<=Date.now()))).sort((a,b)=>String(a.p.dueDate||'').localeCompare(String(b.p.dueDate||''))||b.p.lapses-a.p.lapses||seededRank(seed,a.item.id).localeCompare(seededRank(seed,b.item.id))),fresh=entries.filter(x=>!x.p).sort((a,b)=>seededRank(seed,a.item.id).localeCompare(seededRank(seed,b.item.id)));
+    const reviewLimit=minutes<=5?5:10,newLimit=minutes<=5||due.length>=reviewLimit?0:Math.min(5,profile.newLimit||3),chosenDue=due.slice(0,reviewLimit),chosenFresh=fresh.slice(0,newLimit),steps=[];
+    chosenDue.forEach(({item},index)=>steps.push({taskId:`${date}:r:${index}:${item.id}`,itemId:item.id,skill:'recall',taskType:item.type==='sentence'?'full':'type',mode:item.type==='sentence'?'full':'type',reason:'오늘 복습 예정',estimatedSeconds:45}));
+    chosenFresh.forEach(({item},index)=>steps.push({taskId:`${date}:n:${index}:${item.id}`,itemId:item.id,skill:'recognition',taskType:'flash',mode:'flash',reason:'목표에 맞는 새 표현',estimatedSeconds:50}));
+    return{planId:`plan:${date}:${stableHash(`${seed}:${minutes}:${steps.map(s=>s.itemId).join(',')}`)}`,localDate:date,timezone,version:1,seed:String(seed),budgetMinutes:minutes,steps,estimatedSeconds:steps.reduce((sum,s)=>sum+s.estimatedSeconds,0),counts:{review:chosenDue.length,new:chosenFresh.length,practice:0},remainingReviewCount:Math.max(0,due.length-chosenDue.length)};
+  }
+  function createSession(plan,existing){if(existing&&!existing.completed&&existing.planId===plan.planId)return existing;return{sessionId:`session:${plan.planId}`,planId:plan.planId,localDate:plan.localDate,timezone:plan.timezone,steps:plan.steps,cursor:0,results:{},retryCounts:{},completed:false,startedAt:Date.now()};}
+  function submitSessionAttempt(session,{taskId,attemptId,eventId}){if(session.results[attemptId])return false;session.results[attemptId]={taskId,eventId,submittedAt:Date.now()};const index=session.steps.findIndex(step=>step.taskId===taskId);if(index>=session.cursor)session.cursor=index+1;session.completed=session.cursor>=session.steps.length;return true;}
     const ts=input.ts??Date.now(),correct=input.correct??null,rating=input.rating||(correct===null?'skip':correct?'good':'again');
     const old=state.progress[input.itemId]||{state:'new',reps:0,lapses:0,streak:0,intervalDays:0,dueAt:ts};
     const intervalDays=correct?Math.max(1,old.intervalDays?old.intervalDays*2:1):0;
@@ -130,6 +170,7 @@
     storage.setItem('vm-progress-v2',JSON.stringify(progress));storage.setItem('vm-events-v2','[]');storage.setItem('vm-migration-report',JSON.stringify(report));storage.setItem('vm-migrated-v2','1');return report;
   }
   function exportEnvelope(catalog,state,selection){
+    return{app:'vocabmaster',schemaVersion:SCHEMA_VERSION,exportedAt:Date.now(),items:catalog.items,memberships:catalog.memberships,progress:Object.entries(state.progress||{}).map(([progressId,value])=>({progressId,itemId:progressId.split('::')[0],...value})),events:state.events||[],settings:{selection,profile:state.profile||null},plan:state.plan||null,session:state.session||null};
     return{app:'vocabmaster',schemaVersion:SCHEMA_VERSION,exportedAt:Date.now(),items:catalog.items,memberships:catalog.memberships,progress:Object.entries(state.progress||{}).map(([itemId,value])=>({itemId,...value})),events:state.events||[],settings:{selection}};
   }
   function inspectImport(value,catalog){
@@ -145,6 +186,9 @@
   }
   class LocalStorageRepository{
     constructor(storage){this.storage=storage;}
+    loadSnapshot(){return{progress:JSON.parse(this.storage.getItem('vm-progress-v2')||'{}'),events:JSON.parse(this.storage.getItem('vm-events-v2')||'[]'),selection:JSON.parse(this.storage.getItem('vm-selection-v2')||'null'),profile:JSON.parse(this.storage.getItem('vm-profile-v2')||'null'),plan:JSON.parse(this.storage.getItem('vm-plan-v2')||'null'),session:JSON.parse(this.storage.getItem('vm-session-v2')||'null')};}
+    saveSnapshot(snapshot){
+      const keys=['vm-progress-v2','vm-events-v2','vm-selection-v2','vm-profile-v2','vm-plan-v2','vm-session-v2'],values=[snapshot.progress||{},snapshot.events||[],snapshot.selection||null,snapshot.profile||null,snapshot.plan||null,snapshot.session||null],previous=keys.map(key=>this.storage.getItem(key));
     loadSnapshot(){return{progress:JSON.parse(this.storage.getItem('vm-progress-v2')||'{}'),events:JSON.parse(this.storage.getItem('vm-events-v2')||'[]'),selection:JSON.parse(this.storage.getItem('vm-selection-v2')||'null')};}
     saveSnapshot(snapshot){
       const keys=['vm-progress-v2','vm-events-v2','vm-selection-v2'],values=[snapshot.progress||{},snapshot.events||[],snapshot.selection||null],previous=keys.map(key=>this.storage.getItem(key));
@@ -156,6 +200,12 @@
     applyImport(report,catalog,{merge=true}={}){
       if(!report?.valid||!report.data)throw new Error('검증되지 않은 백업은 적용할 수 없습니다.');
       const current=this.loadSnapshot(),incoming=report.data,knownIds=new Set(catalog.items.map(item=>item.id)),progress=merge?{...current.progress}:{};
+      (incoming.progress||[]).forEach(item=>{if(knownIds.has(item.itemId)){const{itemId,progressId,...value}=item;progress[progressId||itemId]=value;}});
+      const events=merge?[...current.events]:[];(incoming.events||[]).forEach(event=>{if(knownIds.has(event.itemId)&&!events.some(old=>old.id===event.id))events.push(event);});
+      const selection=incoming.settings?.selection||current.selection,snapshot={progress,events,selection,profile:incoming.settings?.profile||current.profile,plan:incoming.plan||current.plan,session:incoming.session||current.session};this.saveSnapshot(snapshot);return snapshot;
+    }
+  }
+  return{SCHEMA_VERSION,MODE_RULES,SKILLS,normalize,escapeHtml,stableHash,canonicalKey,itemIdFor,createRegistry,buildCatalog,selectItems,selectCounts,selectTodayStats,progressKey,progressFor,scheduleProgress,recordStudyEvent,createDailyPlan,createSession,submitSessionAttempt,compatibleItems,localDate,backupLegacy,migrationReport,exportEnvelope,inspectImport,LocalStorageRepository};
       (incoming.progress||[]).forEach(item=>{if(knownIds.has(item.itemId)){const{itemId,...value}=item;progress[itemId]=value;}});
       const events=merge?[...current.events]:[];(incoming.events||[]).forEach(event=>{if(knownIds.has(event.itemId)&&!events.some(old=>old.id===event.id))events.push(event);});
       const selection=incoming.settings?.selection||current.selection,snapshot={progress,events,selection};this.saveSnapshot(snapshot);return snapshot;

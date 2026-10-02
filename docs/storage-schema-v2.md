@@ -19,3 +19,14 @@ JSON 내보내기는 `schemaVersion: 2`인 envelope에 Item, membership, Progres
 - 고급 SRS 최적화와 IndexedDB 전환은 후속 범위다.
 - Whisper 전사는 연결되지 않아 버튼을 비활성화했다. 음성 학습은 지원 브라우저의 Web Speech API를 사용한다.
 - 브라우저 저장 용량 한계가 확인되면 IndexedDB Repository로 교체한다.
+
+## Gate 1 확장
+
+- `vm-profile-v2`: 목표, 일일 시간(기본 15분), 수준, 관심사, IANA 시간대
+- `vm-plan-v2`: 로컬 날짜·시간대·seed·규칙 버전·taskId가 포함된 결정적 오늘 계획
+- `vm-session-v2`: 큐, 커서, 완료 상태, `attemptId`별 제출 결과
+- 능력별 Progress 키는 `itemId::recognition|recall|production|legacy` 형식이다. 기존 `itemId` 키는 읽기 호환용 legacy 상태로 남기며 성공 능력을 추정하지 않는다.
+
+일정 간격은 일 단위 반올림 후 최대 365일이다. Again은 0일, Hard는 신규 1일/기존 1.2배, Good은 1일→3일→2배, Easy는 신규 4일/기존 2.5배로 계산한다. Skip, 취소, 인식 실패, 채점 실패는 이벤트만 중립 결과로 남기고 Progress와 정확도를 변경하지 않는다. `mastered`도 `dueDate`가 지나면 복습 후보에 포함된다.
+
+백업 envelope에는 profile, plan, session을 포함한다. API 키는 내보내지 않으며 Gate 1부터 브라우저 API 키 저장과 제공자 직접 호출을 제거했다.

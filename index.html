@@ -13,15 +13,22 @@
 </head>
 <body>
 
+<div class="modal-overlay" id="onboardingModal" style="display:none">
+  <form class="modal" onsubmit="finishOnboarding(event)">
+    <h2>나에게 맞는 오늘 학습</h2><p>진단 없이도 바로 시작할 수 있고 설정은 나중에 바꿀 수 있어요.</p>
+    <label class="field-label">목표<select id="profileGoal"><option value="both">일상 회화 + 토익스피킹</option><option value="daily">일상 회화</option><option value="toeic">토익스피킹</option></select></label>
+    <label class="field-label">하루 시간<select id="profileMinutes"><option value="15">15분</option><option value="10">10분</option><option value="5">5분</option></select></label>
+    <label class="field-label">수준<select id="profileLevel"><option value="unknown">잘 모르겠어요</option><option value="beginner">초급</option><option value="intermediate">중급</option></select></label>
+    <label class="field-label">관심 주제 (선택)<input id="profileInterests" placeholder="여행, 면접"/></label>
+    <button class="btn primary btn-wide" type="submit">오늘 학습 보기</button>
+  </form>
+</div>
+
 <div class="modal-overlay" id="apiModal">
   <div class="modal">
-    <h2>🔑 Anthropic API 키 입력</h2>
-    <p>AI 연상법·예문 기능을 사용하려면 API 키가 필요해요.<br><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받을 수 있어요.<br>키는 이 브라우저에 저장되며 AI 요청 시 Anthropic에 전송돼요. 공용 기기에서는 사용 후 삭제하세요.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off"/>
-    <button class="btn primary btn-wide" onclick="saveApiKey()">저장하고 시작하기</button>
-    <div style="height:8px"></div>
-    <button class="btn btn-wide" onclick="skipApiKey()">AI 없이 시작하기</button>
-    <div class="modal-note">⚠️ 저장한 키는 AI 요청을 위해 Anthropic에 전송됩니다. <button class="link-btn" onclick="clearApiKey()">키 삭제</button></div>
+    <h2>AI 연결 안내</h2>
+    <p>현재 정적 앱은 API 키를 브라우저에 저장하거나 외부 AI를 직접 호출하지 않습니다. AI 기능은 접근 제어와 사용량 제한이 적용된 서버가 연결된 배포에서만 제공됩니다.</p>
+    <button class="btn primary btn-wide" onclick="document.getElementById('apiModal').style.display='none'">확인</button>
   </div>
 </div>
 
@@ -36,7 +43,7 @@
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.78" y2="4.22"/></svg>
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <button class="btn-api" onclick="showApiModal()">🔑 API 키</button>
+      <button class="btn-api" onclick="showApiModal()">AI 연결 안내</button>
       <button class="btn-api" disabled title="실제 Whisper 전사 연결은 준비 중입니다" id="whisperBtn">🎤 Whisper 준비 중</button>
       <span class="header-badge" id="apiStatus">AI OFF</span>
     </div>
@@ -93,6 +100,14 @@
 
   <!-- ② LEARN DASHBOARD -->
   <div class="screen" id="s-learn">
+    <section class="today-card" aria-labelledby="today-title">
+      <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
+      <p id="today-duration">오늘 약 0분</p>
+      <div class="today-counts" id="today-counts">복습 0개 / 새 표현 0개</div>
+      <button class="btn primary btn-wide today-primary" id="auto-start" onclick="startToday()">오늘 학습 시작</button>
+      <button class="btn btn-wide" onclick="startToday(5)">오늘은 5분만</button>
+      <details><summary>추천 이유</summary><div id="today-reasons"></div></details>
+    </section>
     <div class="dash-summary">
       <div>
         <div class="dash-greeting" id="dash-greeting">오늘도 화이팅! 💪</div>
@@ -116,12 +131,12 @@
     </div>
     <div id="dash-review-alert" style="display:none"></div>
     <section class="selection-card" aria-labelledby="selection-title">
-      <div class="learn-section-title" id="selection-title">학습 Source 선택</div>
+      <div class="learn-section-title" id="selection-title">자유 연습 · Source 선택</div>
       <div id="source-selector" class="source-selector"></div>
       <div class="selection-counts"><span>선택 항목 <strong id="sel-total">0</strong></span><span>신규 <strong id="sel-fresh">0</strong></span><span>오늘 복습 <strong id="sel-due">0</strong></span></div>
       <div class="learn-section-title">학습 Mode 선택</div>
       <div id="mode-selector" class="mode-selector"></div>
-      <button class="btn primary btn-wide" id="today-start" onclick="startSelectedMode()">오늘 학습 시작</button>
+      <button class="btn primary btn-wide" id="today-start" onclick="startSelectedMode()">자유 연습 시작</button>
       <div id="selection-help" class="selection-help" aria-live="polite"></div>
     </section>
 
@@ -291,8 +306,8 @@
 </div>
 
 <nav class="bottom-nav">
-  <button class="bnav-btn active" onclick="go('input')"><span class="bnav-icon">📝</span><span class="bnav-label">입력</span></button>
-  <button class="bnav-btn" onclick="go('learn')"><span class="bnav-icon">🎯</span><span class="bnav-label">학습선택</span></button>
+  <button class="bnav-btn" onclick="go('learn')"><span class="bnav-icon">☀️</span><span class="bnav-label">오늘</span></button>
+  <button class="bnav-btn active" onclick="go('input')"><span class="bnav-icon">📚</span><span class="bnav-label">보관함</span></button>
 </nav>
 
 <script src="js/data.js"></script>

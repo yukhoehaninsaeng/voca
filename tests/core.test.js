@@ -45,6 +45,7 @@ test('P3 오답은 itemId로 기록되어 P4의 다른 문장에 붙지 않는�
 test('선택, Progress, 음성 통계가 새 Repository에서 유지된다',()=>{
   const storage=memoryStorage(),repository=new Core.LocalStorageRepository(storage),item=Core.selectItems(['mine_sentences'],catalog)[0],state={progress:{},events:[]};
   Core.recordStudyEvent(state,{itemId:item.id,sourceIds:['mine_sentences'],mode:'speak',correct:true,ts:new Date(2026,9,2,12).getTime()});repository.saveSnapshot({...state,selection:{sourceIds:['mine_sentences'],mode:'speak'}});
+  const restored=new Core.LocalStorageRepository(storage).loadSnapshot();assert.deepEqual(restored.selection,{sourceIds:['mine_sentences'],mode:'speak'});assert.equal(restored.progress[Core.progressKey(item.id,'production')].reps,1);assert.deepEqual(Core.selectTodayStats(restored.events,'2026-10-02'),{attempts:1,correct:1,accuracy:100,uniqueItems:1});
   const restored=new Core.LocalStorageRepository(storage).loadSnapshot();assert.deepEqual(restored.selection,{sourceIds:['mine_sentences'],mode:'speak'});assert.equal(restored.progress[item.id].reps,1);assert.deepEqual(Core.selectTodayStats(restored.events,'2026-10-02'),{attempts:1,correct:1,accuracy:100,uniqueItems:1});
 });
 
@@ -66,6 +67,44 @@ test('v1 백업과 마이그레이션은 원본을 보존하고 충돌을 보고
 test('JSON 백업은 초기화 후 사용자 Progress와 이벤트를 복원한다',()=>{
   const storage=memoryStorage(),repository=new Core.LocalStorageRepository(storage),item=catalog.items.find(entry=>entry.ko==='납'),snapshot={progress:{[item.id]:{state:'review',reps:3,lapses:1,streak:1,intervalDays:2,dueAt:123}},events:[],selection:{sourceIds:['mine_words'],mode:'flash'}};
   Core.recordStudyEvent(snapshot,{itemId:item.id,sourceIds:['mine_words'],mode:'flash',correct:true});repository.saveSnapshot(snapshot);const report=repository.previewImport(repository.exportJson(catalog),catalog);assert.equal(report.valid,true);
+  repository.saveSnapshot({progress:{},events:[],selection:null});const restored=repository.applyImport(report,catalog,{merge:false});assert.equal(Object.keys(restored.progress).length,2);assert.equal(restored.events.length,1);assert.deepEqual(restored.selection,snapshot.selection);
+});
+
+test('평가는 능력별로 분리되고 중립 결과는 진도와 정확도를 바꾸지 않는다',()=>{
+  const item=catalog.items[0],state={progress:{},events:[]};
+  Core.recordStudyEvent(state,{itemId:item.id,mode:'quiz',correct:true,id:'recognition'});
+  Core.recordStudyEvent(state,{itemId:item.id,mode:'speak',correct:null,rating:'grading_failed',id:'failure'});
+  assert.ok(state.progress[Core.progressKey(item.id,'recognition')]);
+  assert.equal(state.progress[Core.progressKey(item.id,'production')],undefined);
+  assert.deepEqual(Core.selectTodayStats(state.events),{attempts:1,correct:1,accuracy:100,uniqueItems:1});
+});
+
+test('반복 오답 뒤 한 번 정답은 mastered가 아니며 mastered도 due를 유지한다',()=>{
+  const item=catalog.items[0],state={progress:{},events:[]};
+  for(let i=0;i<4;i++)Core.recordStudyEvent(state,{itemId:item.id,mode:'type',correct:false,id:`wrong-${i}`,localDate:'2026-10-02',ts:i});
+  Core.recordStudyEvent(state,{itemId:item.id,mode:'type',correct:true,id:'right',localDate:'2026-10-02',ts:10});
+  const progress=state.progress[Core.progressKey(item.id,'recall')];assert.equal(progress.state,'review');assert.equal(progress.successes,1);assert.equal(progress.lapses,4);
+  progress.state='mastered';progress.dueAt=0;assert.equal(Core.selectCounts([item],state.progress,1).due,1);
+});
+
+test('Again Hard Good Easy는 서로 다른 설명 가능한 일정을 만든다',()=>{
+  const old={intervalDays:10,successes:3,lapses:0};
+  assert.equal(Core.scheduleProgress(old,'again','2026-10-02',{now:0}).intervalDays,0);
+  assert.equal(Core.scheduleProgress(old,'hard','2026-10-02',{now:0}).intervalDays,12);
+  assert.equal(Core.scheduleProgress(old,'good','2026-10-02',{now:0}).intervalDays,20);
+  assert.equal(Core.scheduleProgress(old,'easy','2026-10-02',{now:0}).intervalDays,25);
+});
+
+test('오늘 계획은 재현 가능하고 상한과 5분 규칙을 지킨다',()=>{
+  const progress={};catalog.items.slice(0,100).forEach(item=>progress[Core.progressKey(item.id,'recall')]={state:'review',dueDate:'2026-10-01',lapses:1,intervalDays:1});
+  const input={catalog,progress,profile:{dailyMinutes:15},localDate:'2026-10-02',timezone:'Asia/Seoul',seed:'fixed'};
+  const first=Core.createDailyPlan(input),second=Core.createDailyPlan(input);assert.deepEqual(first,second);assert.equal(first.counts.review,10);assert.equal(first.counts.new,0);assert.equal(first.remainingReviewCount,90);
+  const short=Core.createDailyPlan({...input,budgetMinutes:5});assert.equal(short.counts.review,5);assert.equal(short.counts.new,0);
+});
+
+test('세션 복구와 attemptId 멱등 제출이 동작한다',()=>{
+  const plan=Core.createDailyPlan({catalog,progress:{},profile:{dailyMinutes:15},localDate:'2026-10-02',seed:'fixed'}),session=Core.createSession(plan),task=plan.steps[0];
+  assert.equal(Core.createSession(plan,session),session);assert.equal(Core.submitSessionAttempt(session,{taskId:task.taskId,attemptId:'attempt-1',eventId:'event-1'}),true);assert.equal(Core.submitSessionAttempt(session,{taskId:task.taskId,attemptId:'attempt-1',eventId:'event-1'}),false);assert.equal(session.cursor,1);
   repository.saveSnapshot({progress:{},events:[],selection:null});const restored=repository.applyImport(report,catalog,{merge:false});assert.equal(Object.keys(restored.progress).length,1);assert.equal(restored.events.length,1);assert.deepEqual(restored.selection,snapshot.selection);
 });
 

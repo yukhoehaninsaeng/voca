@@ -84,6 +84,9 @@ async function getAI(){return{scene:'',memory:'',sentence:''};}
 const escapeHtml=VocabCore.escapeHtml;
 function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
 
+const escapeHtml=VocabCore.escapeHtml;
+function renderAiText(container,sections){container.replaceChildren();sections.filter(section=>section.text).forEach(section=>{const wrap=document.createElement('div'),label=document.createElement('div'),text=document.createElement('div');wrap.className='ai-section';label.className=`ai-label ${section.className||''}`;label.textContent=section.label;text.className='ai-text';text.textContent=section.text;wrap.append(label,text);container.append(wrap);});}
+
 /* ─── WORD LIST ──────────────────────────────────────── */
 function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;ownedWords.push({word:w,meaning:m});words=ownedWords;wi.value='';mi.value='';rebuildCatalog();renderWordList();wi.focus();LS.save();}
 function delWord(i){ownedWords.splice(i,1);words=ownedWords;delete errCount[i];rebuildCatalog();renderWordList();LS.save();persistV2();}

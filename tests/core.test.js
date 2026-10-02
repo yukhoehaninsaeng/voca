@@ -46,6 +46,7 @@ test('선택, Progress, 음성 통계가 새 Repository에서 유지된다',()=>
   const storage=memoryStorage(),repository=new Core.LocalStorageRepository(storage),item=Core.selectItems(['mine_sentences'],catalog)[0],state={progress:{},events:[]};
   Core.recordStudyEvent(state,{itemId:item.id,sourceIds:['mine_sentences'],mode:'speak',correct:true,ts:new Date(2026,9,2,12).getTime()});repository.saveSnapshot({...state,selection:{sourceIds:['mine_sentences'],mode:'speak'}});
   const restored=new Core.LocalStorageRepository(storage).loadSnapshot();assert.deepEqual(restored.selection,{sourceIds:['mine_sentences'],mode:'speak'});assert.equal(restored.progress[Core.progressKey(item.id,'production')].reps,1);assert.deepEqual(Core.selectTodayStats(restored.events,'2026-10-02'),{attempts:1,correct:1,accuracy:100,uniqueItems:1});
+  const restored=new Core.LocalStorageRepository(storage).loadSnapshot();assert.deepEqual(restored.selection,{sourceIds:['mine_sentences'],mode:'speak'});assert.equal(restored.progress[item.id].reps,1);assert.deepEqual(Core.selectTodayStats(restored.events,'2026-10-02'),{attempts:1,correct:1,accuracy:100,uniqueItems:1});
 });
 
 test('중간 사용자 단어 삭제 후에도 다른 Item Progress는 유지된다',()=>{
@@ -104,6 +105,7 @@ test('오늘 계획은 재현 가능하고 상한과 5분 규칙을 지킨다',(
 test('세션 복구와 attemptId 멱등 제출이 동작한다',()=>{
   const plan=Core.createDailyPlan({catalog,progress:{},profile:{dailyMinutes:15},localDate:'2026-10-02',seed:'fixed'}),session=Core.createSession(plan),task=plan.steps[0];
   assert.equal(Core.createSession(plan,session),session);assert.equal(Core.submitSessionAttempt(session,{taskId:task.taskId,attemptId:'attempt-1',eventId:'event-1'}),true);assert.equal(Core.submitSessionAttempt(session,{taskId:task.taskId,attemptId:'attempt-1',eventId:'event-1'}),false);assert.equal(session.cursor,1);
+  repository.saveSnapshot({progress:{},events:[],selection:null});const restored=repository.applyImport(report,catalog,{merge:false});assert.equal(Object.keys(restored.progress).length,1);assert.equal(restored.events.length,1);assert.deepEqual(restored.selection,snapshot.selection);
 });
 
 test('가져오기는 변조 데이터와 저장 실패를 거부한다',()=>{

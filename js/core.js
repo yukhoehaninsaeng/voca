@@ -115,6 +115,9 @@
     const passed=rating!=='again',nextSuccesses=passed?successes+1:0;
     return{...old,state:passed?(nextSuccesses>=5?'mastered':'review'):'learning',attempts:(old.attempts||old.reps||0)+1,reps:(old.reps||0)+1,lapses:(old.lapses||0)+(passed?0:1),successes:nextSuccesses,streak:passed?(old.streak||0)+1:0,intervalDays,dueDate:addLocalDays(local,intervalDays),dueAt:options.now==null?undefined:options.now+intervalDays*DAY_MS,lastRating:rating,lastHelped:Boolean(options.helped),lastReviewedAt:options.now};
   }
+    items.forEach(item=>{const progress=progressById[item.id];if(!progress||progress.state==='new')counts.fresh++;if(progress&&progress.state!=='mastered'&&progress.dueAt<=now)counts.due++;if(progress&&(progress.state==='learning'||progress.state==='review'))counts.learning++;if(progress?.state==='mastered')counts.mastered++;});
+    return counts;
+  }
   function localDate(date=new Date()){
     return`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   }
@@ -143,6 +146,13 @@
   }
   function createSession(plan,existing){if(existing&&!existing.completed&&existing.planId===plan.planId)return existing;return{sessionId:`session:${plan.planId}`,planId:plan.planId,localDate:plan.localDate,timezone:plan.timezone,steps:plan.steps,cursor:0,results:{},retryCounts:{},completed:false,startedAt:Date.now()};}
   function submitSessionAttempt(session,{taskId,attemptId,eventId}){if(session.results[attemptId])return false;session.results[attemptId]={taskId,eventId,submittedAt:Date.now()};const index=session.steps.findIndex(step=>step.taskId===taskId);if(index>=session.cursor)session.cursor=index+1;session.completed=session.cursor>=session.steps.length;return true;}
+    const ts=input.ts??Date.now(),correct=input.correct??null,rating=input.rating||(correct===null?'skip':correct?'good':'again');
+    const old=state.progress[input.itemId]||{state:'new',reps:0,lapses:0,streak:0,intervalDays:0,dueAt:ts};
+    const intervalDays=correct?Math.max(1,old.intervalDays?old.intervalDays*2:1):0;
+    state.progress[input.itemId]={...old,state:correct?(old.reps>=4?'mastered':'review'):'learning',reps:old.reps+1,lapses:old.lapses+(correct?0:1),streak:correct?old.streak+1:0,intervalDays,dueAt:ts+intervalDays*DAY_MS,lastReviewedAt:ts};
+    const event={id:input.id||`evt:${ts.toString(36)}:${Math.random().toString(36).slice(2,8)}`,ts,localDate:input.localDate||localDate(new Date(ts)),itemId:input.itemId,sourceIds:[...(input.sourceIds||[])],mode:input.mode,rating,correct,elapsedMs:input.elapsedMs,sessionId:input.sessionId||'legacy'};
+    state.events.push(event);return event;
+  }
   function compatibleItems(items,mode){return(items||[]).filter(item=>(MODE_RULES[mode]||[]).includes(item.type));}
   function backupLegacy(storage){
     const keys=[];
@@ -161,6 +171,7 @@
   }
   function exportEnvelope(catalog,state,selection){
     return{app:'vocabmaster',schemaVersion:SCHEMA_VERSION,exportedAt:Date.now(),items:catalog.items,memberships:catalog.memberships,progress:Object.entries(state.progress||{}).map(([progressId,value])=>({progressId,itemId:progressId.split('::')[0],...value})),events:state.events||[],settings:{selection,profile:state.profile||null},plan:state.plan||null,session:state.session||null};
+    return{app:'vocabmaster',schemaVersion:SCHEMA_VERSION,exportedAt:Date.now(),items:catalog.items,memberships:catalog.memberships,progress:Object.entries(state.progress||{}).map(([itemId,value])=>({itemId,...value})),events:state.events||[],settings:{selection}};
   }
   function inspectImport(value,catalog){
     let data;try{data=typeof value==='string'?JSON.parse(value):value;}catch(error){return{valid:false,newCount:0,duplicateCount:0,conflictCount:0,invalidCount:1,error:'JSON 형식이 올바르지 않습니다.'};}
@@ -178,6 +189,9 @@
     loadSnapshot(){return{progress:JSON.parse(this.storage.getItem('vm-progress-v2')||'{}'),events:JSON.parse(this.storage.getItem('vm-events-v2')||'[]'),selection:JSON.parse(this.storage.getItem('vm-selection-v2')||'null'),profile:JSON.parse(this.storage.getItem('vm-profile-v2')||'null'),plan:JSON.parse(this.storage.getItem('vm-plan-v2')||'null'),session:JSON.parse(this.storage.getItem('vm-session-v2')||'null')};}
     saveSnapshot(snapshot){
       const keys=['vm-progress-v2','vm-events-v2','vm-selection-v2','vm-profile-v2','vm-plan-v2','vm-session-v2'],values=[snapshot.progress||{},snapshot.events||[],snapshot.selection||null,snapshot.profile||null,snapshot.plan||null,snapshot.session||null],previous=keys.map(key=>this.storage.getItem(key));
+    loadSnapshot(){return{progress:JSON.parse(this.storage.getItem('vm-progress-v2')||'{}'),events:JSON.parse(this.storage.getItem('vm-events-v2')||'[]'),selection:JSON.parse(this.storage.getItem('vm-selection-v2')||'null')};}
+    saveSnapshot(snapshot){
+      const keys=['vm-progress-v2','vm-events-v2','vm-selection-v2'],values=[snapshot.progress||{},snapshot.events||[],snapshot.selection||null],previous=keys.map(key=>this.storage.getItem(key));
       try{keys.forEach((key,index)=>this.storage.setItem(key,JSON.stringify(values[index])));}catch(error){keys.forEach((key,index)=>{if(previous[index]===null)this.storage.removeItem(key);else this.storage.setItem(key,previous[index]);});throw error;}
     }
     appendEvent(event){const snapshot=this.loadSnapshot();if(!snapshot.events.some(old=>old.id===event.id))snapshot.events.push(event);this.saveSnapshot(snapshot);}
@@ -192,4 +206,10 @@
     }
   }
   return{SCHEMA_VERSION,MODE_RULES,SKILLS,normalize,escapeHtml,stableHash,canonicalKey,itemIdFor,createRegistry,buildCatalog,selectItems,selectCounts,selectTodayStats,progressKey,progressFor,scheduleProgress,recordStudyEvent,createDailyPlan,createSession,submitSessionAttempt,compatibleItems,localDate,backupLegacy,migrationReport,exportEnvelope,inspectImport,LocalStorageRepository};
+      (incoming.progress||[]).forEach(item=>{if(knownIds.has(item.itemId)){const{itemId,...value}=item;progress[itemId]=value;}});
+      const events=merge?[...current.events]:[];(incoming.events||[]).forEach(event=>{if(knownIds.has(event.itemId)&&!events.some(old=>old.id===event.id))events.push(event);});
+      const selection=incoming.settings?.selection||current.selection,snapshot={progress,events,selection};this.saveSnapshot(snapshot);return snapshot;
+    }
+  }
+  return{SCHEMA_VERSION,MODE_RULES,normalize,escapeHtml,stableHash,canonicalKey,itemIdFor,createRegistry,buildCatalog,selectItems,selectCounts,selectTodayStats,recordStudyEvent,compatibleItems,localDate,backupLegacy,migrationReport,exportEnvelope,inspectImport,LocalStorageRepository};
 });

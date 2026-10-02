@@ -2,8 +2,8 @@
 const LS={
   save(){
     try{
-      localStorage.setItem('vm-words',JSON.stringify(words));
-      localStorage.setItem('vm-sents',JSON.stringify(sents));
+      localStorage.setItem('vm-words',JSON.stringify(typeof ownedWords!=='undefined'?ownedWords:words));
+      localStorage.setItem('vm-sents',JSON.stringify(typeof ownedSents!=='undefined'?ownedSents:sents));
       localStorage.setItem('vm-errCount',JSON.stringify(errCount));
       localStorage.setItem('vm-sErrCount',JSON.stringify(sErrCount));
       localStorage.setItem('vm-selectedPart',selectedPart||'all');
@@ -50,6 +50,20 @@ let tsOk=0,tsNg=0,tsAnswered=false,tsQueue=[],tsIdx=0,toeicSentMode='blank';
 
 // 앱 시작 시 저장된 데이터 복원
 LS.load();
+let ownedWords=words,ownedSents=sents,selectedStudyItems=null;
+let catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});
+let progressById={},studyEvents=[],selection={sourceIds:['mine_words'],mode:'flash',updatedAt:Date.now()};
+try {
+  VocabCore.migrationReport(localStorage,catalog,{words:ownedWords,sents:ownedSents,errCount,sErrCount});
+  progressById=JSON.parse(localStorage.getItem('vm-progress-v2')||'{}');
+  studyEvents=JSON.parse(localStorage.getItem('vm-events-v2')||'[]');
+  selection=JSON.parse(localStorage.getItem('vm-selection-v2')||JSON.stringify(selection));
+} catch(e) { setTimeout(()=>alert('데이터 마이그레이션을 완료하지 못했습니다. 기존 백업은 보존되었습니다: '+e.message),0); }
+function rebuildCatalog(){catalog=VocabCore.buildCatalog({words:ownedWords,sents:ownedSents,toeicParts:TOEIC_PARTS,customCards:CUSTOM_CARDS});}
+function persistV2(){localStorage.setItem('vm-progress-v2',JSON.stringify(progressById));localStorage.setItem('vm-events-v2',JSON.stringify(studyEvents));localStorage.setItem('vm-selection-v2',JSON.stringify(selection));}
+function currentItem(type,en,ko){return catalog.items.find(i=>i.type===type&&i.normalizedEn===VocabCore.normalize(en)&&i.normalizedKo===VocabCore.normalize(ko));}
+function recordResult(type,en,ko,mode,correct,sourceIds=selection.sourceIds){const item=currentItem(type,en,ko);if(!item)return;VocabCore.recordStudyEvent({progress:progressById,events:studyEvents},{itemId:item.id,sourceIds,mode,correct,sessionId:'web'});persistV2();}
+
 
 /* ─── THEME ─────────────────────────────────────────── */
 function toggleTheme(){document.body.classList.toggle('light');const l=document.body.classList.contains('light');localStorage.setItem('vm-theme',l?'light':'dark');document.querySelector('meta[name="theme-color"]').setAttribute('content',l?'#f5f5f8':'#0f0f13');}
@@ -88,15 +102,15 @@ async function getAI(word,meaning){if(aiCache[word])return aiCache[word];if(!API
 
 /* ─── WORD LIST ──────────────────────────────────────── */
 function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=words.length===0;if(!words.length){el.innerHTML='<div class="empty-msg">단어를 추가하면<br>AI 이미지 연상법을 만들어줘요 ✨</div>';return;}el.innerHTML=words.map((w,i)=>{const ec=errCount[i]||0;return`<div class="wi"><span class="wd">${w.word}</span><span class="mn">${w.meaning}</span>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delWord(${i})">×</button></div>`;}).join('');}
-function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;words.push({word:w,meaning:m});wi.value='';mi.value='';renderWordList();wi.focus();LS.save();}
-function delWord(i){words.splice(i,1);delete errCount[i];renderWordList();LS.save();}
+function addWord(){const wi=document.getElementById('wi'),mi=document.getElementById('mi');const w=wi.value.trim(),m=mi.value.trim();if(!w||!m)return;ownedWords.push({word:w,meaning:m});words=ownedWords;wi.value='';mi.value='';rebuildCatalog();renderWordList();wi.focus();LS.save();}
+function delWord(i){ownedWords.splice(i,1);words=ownedWords;delete errCount[i];rebuildCatalog();renderWordList();LS.save();persistV2();}
 document.getElementById('mi').addEventListener('keydown',e=>{if(e.key==='Enter')addWord();});
 document.getElementById('wi').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('mi').focus();});
 
 /* ─── SENT LIST ──────────────────────────────────────── */
 function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=sents.length===0;if(!sents.length){el.innerHTML='<div class="empty-msg">문장을 추가해 학습해요 ✨</div>';return;}el.innerHTML=sents.map((s,i)=>{const ec=sErrCount[i]||0;return`<div class="wi swi"><div class="swi-row"><div class="swi-texts"><div class="sent-en">${s.en}</div><div class="sent-ko">${s.ko}</div></div>${ec>0?`<span class="err-badge">오답 ${ec}회</span>`:''}<button class="del-btn" onclick="delSent(${i})">×</button></div></div>`;}).join('');}
-function addSent(){const ei=document.getElementById('si-en'),ki=document.getElementById('si-ko');const e=ei.value.trim(),k=ki.value.trim();if(!e||!k)return;sents.push({en:e,ko:k});ei.value='';ki.value='';renderSentList();ei.focus();LS.save();}
-function delSent(i){sents.splice(i,1);delete sErrCount[i];renderSentList();LS.save();}
+function addSent(){const ei=document.getElementById('si-en'),ki=document.getElementById('si-ko');const e=ei.value.trim(),k=ki.value.trim();if(!e||!k)return;ownedSents.push({en:e,ko:k});sents=ownedSents;ei.value='';ki.value='';rebuildCatalog();renderSentList();ei.focus();LS.save();}
+function delSent(i){ownedSents.splice(i,1);sents=ownedSents;delete sErrCount[i];rebuildCatalog();renderSentList();LS.save();persistV2();}
 document.getElementById('si-ko').addEventListener('keydown',e=>{if(e.key==='Enter')addSent();});
 
 /* ─── CUSTOM CARD HELPERS ────────────────────────────── */
@@ -207,6 +221,7 @@ function switchInputMode(m){
 
 /* ─── NAV ────────────────────────────────────────────── */
 function go(tab){
+  if(tab==='input'||tab==='learn'){words=ownedWords;sents=ownedSents;selectedStudyItems=null;}
   document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn'][i]===tab));
   document.querySelectorAll('.tnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn'][i]===tab));
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
@@ -296,6 +311,7 @@ function renderLearnScreen(){
   document.getElementById('mc-toeic-voice-cnt').innerHTML=`토익 ${tc} + 내 문장 ${sents.length}개`;
   const voiceEl=document.getElementById('mc-voice-cnt');
   if(voiceEl)voiceEl.innerHTML=`토익 ${tc}문장 + 내 문장 ${sc}개`;
+  renderSelection();
 }
 
 /* ─── QUEUES ─────────────────────────────────────────── */
@@ -331,7 +347,7 @@ function reviewFlash(){
   repeatBanner('f-rq-banner','f-repeat',errCount);updateFStats();showFlash();
 }
 async function flipFlash(wi){if(fFlipped)return;fFlipped=true;const w=words[wi];document.getElementById('fword').style.filter='none';document.getElementById('freveal').classList.add('on');document.getElementById('ftap').style.display='none';const ai=await getAI(w.word,w.meaning);const el=document.getElementById('fai-content');if(!el)return;let h='';if(ai.scene)h+=`<div class="ai-section"><div class="ai-label mem-lbl">🖼 이미지 연상</div><div class="ai-text">${ai.scene}</div></div>`;if(ai.memory)h+=`<div class="ai-section"><div class="ai-label mem-lbl2">💡 기억법</div><div class="ai-text">${ai.memory}</div></div>`;if(ai.sentence){const p=ai.sentence.split('|');h+=`<div class="ai-section"><div class="ai-label ex-lbl">📖 예문</div><div class="ai-text"><em>${p[0]?.trim()||''}</em>${p[1]?'<br>'+p[1].trim():''}</div></div>`;}el.innerHTML=h||'<div style="font-size:.73rem;color:var(--text3);text-align:center;padding:.5rem">API 키를 설정하면 AI 연상법이 표시돼요</div>';}
-function markFlash(wi,know){if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
+function markFlash(wi,know){const studied=words[wi];recordResult('word',studied.word,studied.meaning,'flash',know);if(know){fKnow++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}else{fDunno++;errCount[wi]=(errCount[wi]||0)+1;}fIdx++;const fc=document.getElementById('fcard');if(fc){fc.classList.add('pop');setTimeout(()=>fc.classList.remove('pop'),250);}updateFStats();repeatBanner('f-rq-banner','f-repeat',errCount);renderWordList();LS.save();showFlash();}
 
 /* ─── QUIZ ───────────────────────────────────────────── */
 function initQuiz(){if(words.length<2){document.getElementById('quiz-body').innerHTML='<div class="empty-msg" style="padding:3rem">퀴즈는 단어 2개 이상 필요해요</div>';return;}qQueue=buildQueue([...Array(words.length).keys()],errCount);qIdx=0;qOk=0;qNg=0;qAnswered=false;repeatBanner('q-rq-banner','q-repeat',errCount);updateQStats();showQuiz();}
@@ -372,7 +388,7 @@ function reviewQuiz(){
 async function answerQuiz(btn,chosen,correct,wi){
   if(qAnswered)return;qAnswered=true;
   document.querySelectorAll('.qopt').forEach(b=>{b.disabled=true;if(b.dataset.meaning===correct)b.classList.add('correct');});
-  const ok=chosen===correct;
+  const ok=chosen===correct;recordResult('word',words[wi].word,words[wi].meaning,'quiz',ok);
   if(ok){qOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
   else{btn.classList.add('wrong');qNg++;errCount[wi]=(errCount[wi]||0)+1;trackWrongWord(words[wi]?.word,words[wi]?.meaning);}
   updateQStats();repeatBanner('q-rq-banner','q-repeat',errCount);renderWordList();LS.save();
@@ -422,7 +438,7 @@ async function checkType(wi){
   inp.disabled=true;const chk=document.getElementById('tchk');if(chk)chk.disabled=true;
   // 채점 후 입력란 숨기기
   const row=document.getElementById('tinput-row');if(row)row.style.display='none';
-  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();
+  const w=words[wi],ok=val.toLowerCase()===w.word.toLowerCase();recordResult('word',w.word,w.meaning,'type',ok);
   inp.classList.add(ok?'tok':'tng');
   w.word.split('').forEach((ch,i)=>{const hb=document.getElementById('hb'+i);if(hb){hb.textContent=ch;hb.className='hbox '+(ok?'ok2':'ng2');}});
   if(ok){tOk++;if(errCount[wi]>0)errCount[wi]=Math.max(0,errCount[wi]-1);}
@@ -514,7 +530,7 @@ function checkBlank(prefix){
   // 채점 후 입력란+버튼 숨기기
   const row=document.getElementById(prefix+'binp-row');if(row)row.style.display='none';
   inp.disabled=true;
-  const ok=normalize(val)===normalize(blank);
+  const ok=normalize(val)===normalize(blank);recordResult('sentence',src.en,src.ko,'blank',ok,prefix==='ts'?selection.sourceIds:['mine_sentences']);
   const isUser=(prefix==='s');
   if(isUser){
     if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
@@ -522,7 +538,7 @@ function checkBlank(prefix){
     updateSStats();renderSentList();LS.save();
   }else{
     if(ok){tsOk++;if(toeicErrCount[si]>0)toeicErrCount[si]=Math.max(0,toeicErrCount[si]-1);}
-    else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;trackWrongWord(blank,null);}
+    else{tsNg++;toeicErrCount[si]=(toeicErrCount[si]||0)+1;}
     updateTsStats();
   }
   const src=isUser?sents[si]:getToeicSents()[si];
@@ -552,7 +568,7 @@ function checkFull(prefix,si){
   // 채점 후 입력란+채점버튼 숨기기
   const wrap=document.getElementById(prefix+'full-input-wrap');if(wrap)wrap.style.display='none';
   const isUser=(prefix==='s');const src=isUser?sents[si]:getToeicSents()[si];
-  const ok=normalize(val)===normalize(src.en);ta.classList.add(ok?'tok':'tng');
+  const ok=normalize(val)===normalize(src.en);recordResult('sentence',src.en,src.ko,'full',ok,prefix==='ts'?selection.sourceIds:['mine_sentences']);ta.classList.add(ok?'tok':'tng');
   if(isUser){
     if(ok){sOk++;if(sErrCount[si]>0)sErrCount[si]=Math.max(0,sErrCount[si]-1);}
     else{sNg++;sErrCount[si]=(sErrCount[si]||0)+1;}
@@ -953,6 +969,7 @@ Output JSON only (no markdown):
   }
 
   const ok=result.correct;
+  recordResult('sentence',s.en,s.ko,'speak',ok,selection.sourceIds);
   if(ok){vOk++;}else{vNg++;}
   updateVStats();
 
@@ -1024,3 +1041,27 @@ renderSentList();
     }
   }catch(e){}
 })();
+
+/* ─── V2 ITEM/SOURCE UI ─────────────────────────────── */
+function renderSelection(){
+  const host=document.getElementById('source-selector');if(!host)return;
+  const visible=catalog.sources.filter(s=>s.id!=='vocab_master_all');host.replaceChildren();
+  visible.forEach(source=>{const label=document.createElement('label');label.className='source-option';const box=document.createElement('input');box.type='checkbox';box.checked=selection.sourceIds.includes(source.id);box.addEventListener('change',()=>toggleSource(source.id,box.checked));const name=document.createElement('span');name.textContent=source.name;const count=document.createElement('small');count.textContent=VocabCore.selectItems([source.id],catalog,progressById).length+'개';label.append(box,name,count);host.append(label);});
+  const items=VocabCore.selectItems(selection.sourceIds,catalog,progressById),counts=VocabCore.selectCounts(items,progressById);document.getElementById('sel-total').textContent=counts.total;document.getElementById('sel-fresh').textContent=counts.fresh;document.getElementById('sel-due').textContent=counts.due;
+  const modes={flash:'플래시카드',quiz:'객관식',type:'뜻→영 입력',blank:'빈칸',full:'전체 받아쓰기',speak:'음성 말하기'},mh=document.getElementById('mode-selector');mh.replaceChildren();Object.entries(modes).forEach(([id,name])=>{const compatible=VocabCore.compatibleItems(items,id),button=document.createElement('button');button.className='mode-option'+(selection.mode===id?' active':'');button.disabled=!compatible.length;button.textContent=name;const small=document.createElement('small');small.textContent=compatible.length?`실제 학습 큐 ${compatible.length}개`:`선택 항목 타입과 호환되지 않음`;button.append(small);button.addEventListener('click',()=>{selection.mode=id;selection.updatedAt=Date.now();persistV2();renderSelection();});mh.append(button);});
+  const today=VocabCore.selectTodayStats(studyEvents);document.getElementById('ds-total').textContent=today.attempts;document.getElementById('ds-correct').textContent=today.correct;document.getElementById('ds-review').textContent=counts.due;document.getElementById('dash-ring-pct').textContent=(today.accuracy??0)+'%';document.getElementById('dash-sub').textContent=today.attempts?`오늘 ${today.attempts}문제 · 정확도 ${today.accuracy}%`:`선택 항목 ${counts.total}개 · 오늘 복습 ${counts.due}개`;
+  const start=document.getElementById('today-start'),queue=VocabCore.compatibleItems(items,selection.mode);start.disabled=!selection.mode||!queue.length;document.getElementById('selection-help').textContent=queue.length?`선택 Source의 중복을 제거한 ${queue.length}개 항목을 학습합니다.`:'Source와 호환되는 Mode를 선택해주세요.';
+}
+function toggleSource(id,checked){const set=new Set(selection.sourceIds);checked?set.add(id):set.delete(id);selection={...selection,sourceIds:[...set],updatedAt:Date.now()};persistV2();renderSelection();}
+function startSelectedMode(){const items=VocabCore.compatibleItems(VocabCore.selectItems(selection.sourceIds,catalog,progressById),selection.mode);if(!items.length)return;selectedStudyItems=items;if(items[0].type==='word'){words=items.map(i=>({word:i.en,meaning:i.ko}));if(selection.mode==='flash')go('flash');else if(selection.mode==='quiz')go('quiz');else go('type');return;}sents=items.map(i=>({en:i.en,ko:i.ko}));selectedPart=null;selectedCustom=null;if(selection.mode==='speak'){voiceSource='user';go('voice');}else if(selection.mode==='blank'||selection.mode==='full'){setSentModeAndGo(selection.mode,'user');}else{sentMode='full';go('sent');}}
+function clearApiKey(){API_KEY='';localStorage.removeItem('vm-apikey');document.getElementById('apiKeyInput').value='';document.getElementById('apiStatus').textContent='AI OFF';document.getElementById('apiModal').style.display='none';}
+function filterLibrary(query){const q=VocabCore.normalize(query);document.querySelectorAll('#wlist .wi,#slist .wi').forEach(row=>{row.style.display=!q||VocabCore.normalize(row.textContent).includes(q)?'':'none';});}
+function parsedBulk(){return document.getElementById('bulk-input').value.split(/\r?\n/).filter(Boolean).map((line,index)=>{const parts=line.split(/\s*[|\t]\s*/);return{line:index+1,en:(parts[0]||'').trim(),ko:(parts.slice(1).join(' | ')||'').trim(),valid:parts.length>1&&parts[0].trim()&&parts[1].trim()};});}
+function previewBulk(){const rows=parsedBulk(),valid=rows.filter(r=>r.valid).length;document.getElementById('bulk-preview').textContent=`${rows.length}줄 중 ${valid}개 등록 가능 · ${rows.length-valid}개 무효`;}
+function applyBulk(){const rows=parsedBulk().filter(r=>r.valid);if(!rows.length)return previewBulk();const sentenceTab=document.getElementById('sw-sent').classList.contains('active');rows.forEach(r=>sentenceTab?ownedSents.push({en:r.en,ko:r.ko}):ownedWords.push({word:r.en,meaning:r.ko}));words=ownedWords;sents=ownedSents;rebuildCatalog();LS.save();renderWordList();renderSentList();document.getElementById('bulk-input').value='';document.getElementById('bulk-preview').textContent=`${rows.length}개를 학습 목록에 등록했습니다.`;}
+function exportData(){const envelope=VocabCore.exportEnvelope(catalog,{progress:progressById,events:studyEvents},selection),blob=new Blob([JSON.stringify(envelope,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`vocabmaster-${VocabCore.localDate()}.json`;a.click();URL.revokeObjectURL(a.href);}
+async function importData(file){const out=document.getElementById('import-report');if(!file)return;const text=await file.text(),report=VocabCore.inspectImport(text,catalog);out.textContent=report.valid?`신규 ${report.newCount} · 중복 ${report.duplicateCount} · 충돌 ${report.conflictCount} · 무효 ${report.invalidCount}`:report.error;if(!report.valid||!confirm(out.textContent+'\n이 백업을 병합할까요?'))return;(report.data.items||[]).forEach(item=>{if(catalog.items.some(i=>i.id===item.id))return;const sources=(report.data.memberships||[]).filter(m=>m.itemId===item.id).map(m=>m.sourceId);if(sources.includes('mine_words'))ownedWords.push({word:item.en,meaning:item.ko});if(sources.includes('mine_sentences'))ownedSents.push({en:item.en,ko:item.ko});});(report.data.progress||[]).forEach(p=>{progressById[p.itemId]=p;});studyEvents=[...studyEvents,...(report.data.events||[]).filter(e=>!studyEvents.some(old=>old.id===e.id))];rebuildCatalog();LS.save();persistV2();renderWordList();renderSentList();out.textContent+=' · 적용 완료';}
+
+/* User-owned text is always inserted as text, never parsed as markup. */
+function renderWordList(){const el=document.getElementById('wlist');document.getElementById('startBtn').disabled=ownedWords.length===0;el.replaceChildren();if(!ownedWords.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='단어를 추가하면 AI 이미지 연상법을 만들어줘요 ✨';el.append(empty);return;}ownedWords.forEach((word,index)=>{const row=document.createElement('div');row.className='wi';const en=document.createElement('span');en.className='wd';en.textContent=word.word;const ko=document.createElement('span');ko.className='mn';ko.textContent=word.meaning;row.append(en,ko);const item=currentItem('word',word.word,word.meaning),lapses=item?progressById[item.id]?.lapses:0;if(lapses){const badge=document.createElement('span');badge.className='err-badge';badge.textContent=`오답 ${lapses}회`;row.append(badge);}const button=document.createElement('button');button.className='del-btn';button.textContent='×';button.setAttribute('aria-label',`${word.word} 삭제`);button.addEventListener('click',()=>delWord(index));row.append(button);el.append(row);});}
+function renderSentList(){const el=document.getElementById('slist');document.getElementById('startSentBtn').disabled=ownedSents.length===0;el.replaceChildren();if(!ownedSents.length){const empty=document.createElement('div');empty.className='empty-msg';empty.textContent='문장을 추가해 학습해요 ✨';el.append(empty);return;}ownedSents.forEach((sentence,index)=>{const row=document.createElement('div');row.className='wi swi';const texts=document.createElement('div');texts.className='swi-texts';const en=document.createElement('div');en.className='sent-en';en.textContent=sentence.en;const ko=document.createElement('div');ko.className='sent-ko';ko.textContent=sentence.ko;texts.append(en,ko);const button=document.createElement('button');button.className='del-btn';button.textContent='×';button.setAttribute('aria-label','문장 삭제');button.addEventListener('click',()=>delSent(index));row.append(texts,button);el.append(row);});}

@@ -24,9 +24,10 @@ test('앱 초기화와 주요 버튼 핸들러가 런타임 오류 없이 동작
   assert.equal(context.document.getElementById('apiModal').style.display||'none','none');
   assert.equal(elements.get('onboardingModal').style.display,'flex');
   assert.doesNotThrow(()=>context.document.getElementById('onboardingForm').dispatchEvent({type:'submit',preventDefault(){}}));
-  for(const source of ["go('input')","switchInputMode('sent')","go('learn')","startToday()","showApiModal()"])assert.doesNotThrow(()=>vm.runInContext(source,context),source);
+  for(const source of ["go('input')","switchInputMode('sent')","go('learn')","go('profile')","startToday()","showApiModal()"])assert.doesNotThrow(()=>vm.runInContext(source,context),source);
   const profile=JSON.parse(localStorage.getItem('vm-profile-v2'));assert.deepEqual({goal:profile.goal,dailyMinutes:profile.dailyMinutes,dailyItemLimit:profile.dailyItemLimit,level:profile.level,interests:Array.from(profile.interests)},{goal:'daily',dailyMinutes:10,dailyItemLimit:15,level:'beginner',interests:['여행','면접']});
   assert.equal(elements.get('onboardingModal').style.display,'none');
+  context.document.getElementById('settingsItemLimit').value='20';context.document.getElementById('settingsToeicScore').value='160';context.document.getElementById('profileSettingsForm').dispatchEvent({type:'submit',preventDefault(){}});const updated=JSON.parse(localStorage.getItem('vm-profile-v2'));assert.equal(updated.dailyItemLimit,20);assert.equal(updated.toeicSpeakingScore,160);assert.equal(context.document.getElementById('profile-level-badge').textContent,'AL · 160점');
   const html=fs.readFileSync('index.html','utf8'),handlers=[...html.matchAll(/onclick="([A-Za-z_$][\w$]*)\s*\(/g)].map(match=>match[1]);
   for(const handler of new Set(handlers))assert.equal(vm.runInContext(`typeof ${handler}`,context),'function',`${handler} 버튼 핸들러`);
 });

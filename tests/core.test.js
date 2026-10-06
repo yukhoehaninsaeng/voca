@@ -111,3 +111,10 @@ test('가져오기는 변조 데이터와 저장 실패를 거부한다',()=>{
   const envelope=Core.exportEnvelope(catalog,{progress:{},events:[]},null);envelope.items[0].en='tampered';assert.equal(Core.inspectImport(envelope,catalog).valid,false);
   const map=new Map();let writes=0;const broken={getItem:key=>map.get(key)??null,setItem:(key,value)=>{if(++writes===2)throw new Error('quota');map.set(key,String(value));},removeItem:key=>map.delete(key)};assert.throws(()=>new Core.LocalStorageRepository(broken).saveSnapshot({progress:{a:1},events:[],selection:null}),/quota/);assert.equal(broken.getItem('vm-progress-v2'),null);
 });
+
+test('마이페이지 지표는 공부한 표현, 숙련 표현, 연속일과 최근 정확도를 계산한다',()=>{
+  const progress={'w:a::recall':{state:'mastered'},'w:b::recognition':{state:'review'}},events=[
+    {itemId:'w:a',localDate:'2026-10-02',correct:true},{itemId:'w:a',localDate:'2026-10-01',correct:false},{itemId:'w:b',localDate:'2026-10-01',correct:true},{itemId:'w:c',localDate:'2026-09-20',correct:true},{itemId:'w:d',localDate:'2026-10-02',correct:null}
+  ];
+  assert.deepEqual(Core.selectLearningMetrics(events,progress,'2026-10-02'),{studiedItems:3,masteredItems:1,totalAttempts:4,totalCorrect:3,studyDays:3,currentStreak:2,recentAttempts:3,recentAccuracy:67});
+});

@@ -123,6 +123,14 @@
     const correct=answered.filter(event=>event.correct).length;
     return{attempts:answered.length,correct,accuracy:answered.length?Math.round(correct/answered.length*100):null,uniqueItems:new Set(answered.map(event=>event.itemId)).size};
   }
+  function selectLearningMetrics(events=[],progress={},today=localDate()){
+    const answered=events.filter(event=>event.correct!==null),uniqueStudied=new Set(answered.map(event=>event.itemId)),masteredItems=new Set();
+    Object.entries(progress).forEach(([key,value])=>{if(value?.state==='mastered')masteredItems.add(key.split('::')[0]);});
+    const dates=[...new Set(answered.map(event=>event.localDate).filter(Boolean))].sort().reverse();let streak=0,cursor=today;
+    for(const date of dates){if(date===cursor){streak++;cursor=addLocalDays(cursor,-1);}else if(date<cursor)break;}
+    const recentStart=addLocalDays(today,-6),recent=answered.filter(event=>event.localDate>=recentStart&&event.localDate<=today),recentCorrect=recent.filter(event=>event.correct).length;
+    return{studiedItems:uniqueStudied.size,masteredItems:masteredItems.size,totalAttempts:answered.length,totalCorrect:answered.filter(event=>event.correct).length,studyDays:dates.length,currentStreak:streak,recentAttempts:recent.length,recentAccuracy:recent.length?Math.round(recentCorrect/recent.length*100):null};
+  }
   function recordStudyEvent(state,input){
     if(!input.itemId||!MODE_RULES[input.mode])throw new Error('유효한 itemId와 mode가 필요합니다.');
     const ts=input.ts??Date.now(),date=input.localDate||localDate(new Date(ts)),correct=input.correct??null,rating=input.rating||(correct===null?'skip':correct?'good':'again'),skill=input.skill||({quiz:'recognition',flash:'recognition',type:'recall',blank:'recall',full:'production',speak:'production'}[input.mode]),attemptId=input.attemptId||input.id;
@@ -192,5 +200,5 @@
       const selection=incoming.settings?.selection||current.selection,snapshot={progress,events,selection,profile:incoming.settings?.profile||current.profile,plan:incoming.plan||current.plan,session:incoming.session||current.session};this.saveSnapshot(snapshot);return snapshot;
     }
   }
-  return{SCHEMA_VERSION,MODE_RULES,SKILLS,normalize,escapeHtml,stableHash,canonicalKey,itemIdFor,createRegistry,buildCatalog,selectItems,selectCounts,selectTodayStats,progressKey,progressFor,scheduleProgress,recordStudyEvent,createDailyPlan,createSession,submitSessionAttempt,compatibleItems,localDate,backupLegacy,migrationReport,exportEnvelope,inspectImport,LocalStorageRepository};
+  return{SCHEMA_VERSION,MODE_RULES,SKILLS,normalize,escapeHtml,stableHash,canonicalKey,itemIdFor,createRegistry,buildCatalog,selectItems,selectCounts,selectTodayStats,selectLearningMetrics,progressKey,progressFor,scheduleProgress,recordStudyEvent,createDailyPlan,createSession,submitSessionAttempt,compatibleItems,localDate,backupLegacy,migrationReport,exportEnvelope,inspectImport,LocalStorageRepository};
 });

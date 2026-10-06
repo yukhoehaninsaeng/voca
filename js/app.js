@@ -220,9 +220,9 @@ function switchInputMode(m){
 
 /* ─── NAV ────────────────────────────────────────────── */
 function go(tab){
-  if(tab==='input'||tab==='learn'){words=ownedWords;sents=ownedSents;selectedStudyItems=null;}
-  document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['learn','input'][i]===tab));
-  document.querySelectorAll('.tnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn'][i]===tab));
+  if(tab==='input'||tab==='learn'||tab==='profile'){words=ownedWords;sents=ownedSents;selectedStudyItems=null;}
+  document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['learn','input','profile'][i]===tab));
+  document.querySelectorAll('.tnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn','profile'][i]===tab));
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   const target=document.getElementById('s-'+tab);if(!target)return;
   target.classList.add('on');
@@ -236,6 +236,7 @@ function go(tab){
   if(tab==='sent')initSent();
   if(tab==='toeic')initToeic();
   if(tab==='voice')initVoice();
+  if(tab==='profile')renderProfile();
 }
 
 /* ─── DASHBOARD ──────────────────────────────────────── */
@@ -1018,6 +1019,10 @@ function ensureTodayPlan(minutes){
 }
 function renderTodayPlan(){const plan=ensureTodayPlan(),limit=document.getElementById('todayItemLimit');if(limit)limit.value=String(plan.itemLimit||10);const minutes=Math.max(1,Math.ceil(plan.estimatedSeconds/60));document.getElementById('today-duration').textContent=`오늘 약 ${minutes}분`;document.getElementById('today-counts').textContent=`복습 ${plan.counts.review}개 / 새 표현 ${plan.counts.new}개${plan.remainingReviewCount?` / 추가 복습 ${plan.remainingReviewCount}개`:''}`;document.getElementById('today-reasons').textContent=[...new Set(plan.steps.map(step=>step.reason))].join(' · ')||'학습 항목을 보관함에 추가하면 자동으로 계획해요.';const button=document.getElementById('auto-start');button.textContent=dailySession&&!dailySession.completed&&dailySession.cursor>0?'이어하기':'오늘 학습 시작';button.disabled=!plan.steps.length;}
 function changeTodayItemLimit(value){const count=Number(value);if(![5,10,15,20].includes(count))return;userProfile={...(userProfile||{}),dailyItemLimit:count,dailyMinutes:userProfile?.dailyMinutes||15,timezone:userProfile?.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone};dailyPlan=null;dailySession=null;persistV2();renderTodayPlan();}
+function toeicSpeakingLevel(score){if(!Number.isFinite(score))return{code:'미설정',label:'TOEIC Speaking 점수를 입력하세요'};if(score>=200)return{code:'AH',label:'Advanced High'};if(score>=180)return{code:'AM',label:'Advanced Mid'};if(score>=160)return{code:'AL',label:'Advanced Low'};if(score>=140)return{code:'IH',label:'Intermediate High'};if(score>=110)return{code:'IM',label:'Intermediate Mid'};if(score>=90)return{code:'IL',label:'Intermediate Low'};if(score>=60)return{code:'NH',label:'Novice High'};return{code:'NM/NL',label:'Novice Mid / Low'};}
+function renderProfile(){const metrics=VocabCore.selectLearningMetrics(studyEvents,progressById),storedScore=userProfile?.toeicSpeakingScore,parsedScore=Number(storedScore),score=storedScore===null||storedScore===undefined||!Number.isFinite(parsedScore)?null:parsedScore,level=toeicSpeakingLevel(score);document.getElementById('metric-studied').textContent=metrics.studiedItems;document.getElementById('metric-mastered').textContent=metrics.masteredItems;document.getElementById('metric-days').textContent=metrics.studyDays;document.getElementById('metric-streak').textContent=metrics.currentStreak;document.getElementById('metric-recent-attempts').textContent=metrics.recentAttempts;document.getElementById('metric-recent-accuracy').textContent=metrics.recentAccuracy===null?'-':`${metrics.recentAccuracy}%`;document.getElementById('metric-total').textContent=`누적 시도 ${metrics.totalAttempts}회 · 정답 ${metrics.totalCorrect}회`;document.getElementById('profile-level-badge').textContent=score===null?'토스 미설정':`${level.code} · ${score}점`;document.getElementById('settingsItemLimit').value=String(userProfile?.dailyItemLimit||10);document.getElementById('settingsToeicScore').value=score===null?'':String(score);document.getElementById('toeicLevelGuide').textContent=score===null?'최근 공식 성적표의 점수를 입력하세요. 점수는 자기 설정 단계에만 사용됩니다.':`${level.code} · ${level.label} — 입력한 ${score}점 기준`;}
+function saveProfileSettings(event){event.preventDefault();const limit=Number(document.getElementById('settingsItemLimit').value),raw=document.getElementById('settingsToeicScore').value.trim(),score=raw===''?null:Number(raw),message=document.getElementById('profileSaveMessage');if(![5,10,15,20].includes(limit)||score!==null&&(!Number.isFinite(score)||score<0||score>200||score%10!==0)){message.textContent='점수는 0~200 사이의 10점 단위로 입력해주세요.';return;}userProfile={...(userProfile||{}),dailyItemLimit:limit,toeicSpeakingScore:score,dailyMinutes:userProfile?.dailyMinutes||15,timezone:userProfile?.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone};dailyPlan=null;dailySession=null;persistV2();message.textContent='설정을 저장했습니다.';renderProfile();renderTodayPlan();}
+document.getElementById('profileSettingsForm')?.addEventListener('submit',saveProfileSettings);
 function startToday(minutes){const plan=ensureTodayPlan(minutes),completed=new Set(Object.values(dailySession.results||{}).map(result=>result.taskId)),remaining=plan.steps.filter(step=>!completed.has(step.taskId));if(!remaining.length){dailySession.completed=true;persistV2();renderTodayPlan();return;}const mode=remaining[0].mode,ids=new Set(remaining.filter(step=>step.mode===mode).map(step=>step.itemId)),items=catalog.items.filter(item=>ids.has(item.id));selection={...selection,sourceIds:catalog.sources.filter(source=>source.kind!=='virtual').map(source=>source.id),mode};selectedStudyItems=items;persistV2();if(['flash','type'].includes(mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount={};go(mode);return;}sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount={};setSentModeAndGo(mode,'user');}
 function finishOnboarding(event){
   event?.preventDefault();

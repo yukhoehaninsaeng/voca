@@ -22,7 +22,7 @@ JSON 내보내기는 `schemaVersion: 2`인 envelope에 Item, membership, Progres
 
 ## Gate 1 확장
 
-- `vm-profile-v2`: 목표, 일일 시간(기본 15분), 일일 표현 수(5/10/15/20), 수준, 관심사, IANA 시간대
+- `vm-profile-v2`: 목표, 일일 시간(기본 15분), 일일 표현 수(5/10/15/20), 수준, 관심사, 사용자가 입력한 TOEIC Speaking 점수, IANA 시간대
 - `vm-plan-v2`: 로컬 날짜·시간대·seed·규칙 버전·taskId가 포함된 결정적 오늘 계획
 - `vm-session-v2`: 큐, 커서, 완료 상태, `attemptId`별 제출 결과
 - 능력별 Progress 키는 `itemId::recognition|recall|production|legacy` 형식이다. 기존 `itemId` 키는 읽기 호환용 legacy 상태로 남기며 성공 능력을 추정하지 않는다.

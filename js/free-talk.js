@@ -2,7 +2,7 @@
 (function(){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   let recognition=null, busy=false, history=[],topic='daily life',listening=false, sessionId=0;
-  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0,callActive=false,captions=false;
+  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0,callActive=false,captions=false,autoTurn=false,silenceTimer=null,heardSpeech=false;
   const $=id=>document.getElementById(id);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const status=message=>{if($('talk-status'))$('talk-status').textContent=message;};
@@ -52,7 +52,7 @@
   function stopCallClock(){if(callClock){clearInterval(callClock);callClock=null;}callStartedAt=0;updateCallClock();}
   window.talkPreviewVoice=function(){speak('Hi! It is nice to meet you. How are you today?',false);};
   function speak(message,autoListen=true){
-    if(!('speechSynthesis' in window)){status('음성 재생 미지원 · 텍스트를 확인해 주세요.');return;}
+    if(!('speechSynthesis' in window)){status('음성 재생 미지원 · 텍스트를 확인해 주세요.');callState('error');return;}
     window.speechSynthesis.cancel();
     avatarState('speaking');
     const utterance=new SpeechSynthesisUtterance(message);
@@ -61,10 +61,13 @@
     if(voice)utterance.voice=voice;
     utterance.lang=voice?.lang||'en-US';utterance.rate=1;utterance.pitch=1;
     callState('speaking');
-    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';if(autoListen&&callActive&&!busy&&!listening)begin();};
-    utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
+    utterance.onend=()=>{callState('idle');avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';if(autoListen&&callActive&&!busy&&!listening)begin();};
+    utterance.onerror=()=>{callState('error');avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
+  function clearSilence(){if(silenceTimer){clearTimeout(silenceTimer);silenceTimer=null;}}
+  function scheduleSilence(){clearSilence();if(!autoTurn||!callActive||!listening||!heardSpeech)return;silenceTimer=setTimeout(()=>{silenceTimer=null;if(autoTurn&&callActive&&listening&&(finalized||interim))finishSpeech();},2300);}
+  window.talkSetAutoTurn=function(checked){autoTurn=Boolean(checked);if(!autoTurn)clearSilence();status(autoTurn?'자동 턴 전환 켜짐 · 말한 뒤 약 2.3초 멈추면 답변을 보냅니다.':'수동 턴 전환 · 말하기 완료를 눌러 전송하세요.');};
   function updateTranscript(){
     const node=$('talk-live-transcript');
     if(node){node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();node.hidden=!captions;}
@@ -77,7 +80,7 @@
   }
   function finishSpeech(){
     if(!recognition||!listening)return;
-    manualStop=true;submitWhenStopped=true;
+    clearSilence();manualStop=true;submitWhenStopped=true;
     status('말하기를 마무리하고 있어요...');
     try{recognition.stop();}catch(e){completeSpeech();}
   }
@@ -96,7 +99,7 @@
     if(recognition||busy)return;
     if(!SpeechRecognition){status('이 브라우저는 음성 인식을 지원하지 않아요. 텍스트 입력을 이용해 주세요.');return;}
     window.speechSynthesis?.cancel();
-    finalized='';interim='';submitWhenStopped=false;manualStop=false;
+    clearSilence();heardSpeech=false;finalized='';interim='';submitWhenStopped=false;manualStop=false;
     const token=++recognitionToken;
     try{
       const rec=new SpeechRecognition();recognition=rec;
@@ -110,7 +113,7 @@
           if(!phrase)continue;
           (event.results[i].isFinal?finals:partials).push(phrase);
         }
-        finalized=finals.join(' ');interim=partials.join(' ');updateTranscript();
+        finalized=finals.join(' ');interim=partials.join(' ');heardSpeech=Boolean(finalized||interim);updateTranscript();scheduleSilence();
       };
       rec.onerror=event=>{
         if(token!==recognitionToken)return;
@@ -122,6 +125,8 @@
       };
       rec.onend=()=>{
         if(token!==recognitionToken)return;
+        clearSilence();
+        if(!manualStop&&autoTurn&&callActive&&(finalized||interim)){submitWhenStopped=true;manualStop=true;}
         // Chrome may stop on silence despite continuous=true. Never auto-send.
         // If the user explicitly finished, send the accumulated transcript.
         if(!manualStop){
@@ -201,7 +206,7 @@
     input.value='';send(value);
   };
   window.talkReset=function(){
-    sessionId++;callActive=false;stopCallClock();callState('idle');
+    clearSilence();sessionId++;callActive=false;stopCallClock();callState('idle');
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
     if($('talk-input'))$('talk-input').value='';
@@ -215,7 +220,8 @@
     callState('idle');status('음성 대화 시작을 눌러 AI 친구의 첫 질문을 들어 보세요.');updateButton();
   };
   window.talkStop=function(){
-    const snapshot=history.map(m=>({...m}));sessionId++;callActive=false;stopCallClock();callState('idle');
+    const snapshot=history.map(m=>({...m}));clearSilence();sessionId++;callActive=false;stopCallClock();callState('idle');
+    window.dispatchEvent(new CustomEvent('voca-conversation-finished',{detail:{topic,history:snapshot}}));
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;updateButton();status('대화를 종료했어요.');
     if($('talk-log'))$('talk-log').hidden=false;

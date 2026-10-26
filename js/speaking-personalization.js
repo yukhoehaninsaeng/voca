@@ -63,9 +63,9 @@
   $('speaking-plan-date').textContent=p.date+' 추천 · 5문장';
  }
  function start(){
-  const p=plan(),m=metrics(),target=p.ids.map(id=>catalog.find(c=>c.id===id)).filter(Boolean).sort((a,b)=>score(b,m).score-score(a,m).score)[0];
-  if(!target)return;
-  window.dispatchEvent(new CustomEvent('voca-retrieval-select',{detail:{id:target.id}}));
+  const p=plan();
+  if(!p.ids.length)return;
+  window.dispatchEvent(new CustomEvent('voca-retrieval-select',{detail:{ids:p.ids}}));
   if(typeof window.go==='function')window.go('retrieval');
   $('retrieval-prompt')?.scrollIntoView?.({behavior:'smooth',block:'center'});
  }

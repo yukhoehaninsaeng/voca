@@ -196,8 +196,8 @@
   };
   window.talkStop=function(){
     const snapshot=history.map(m=>({...m}));sessionId++;callActive=false;
-    if(recognition){recognition.abort();recognition=null;}
-    window.speechSynthesis?.cancel();avatarState('idle');listening=false;updateButton();status('대화를 종료했어요.');
+    recognitionToken++;if(recognition){recognition.abort();recognition=null;}
+    window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;updateButton();status('대화를 종료했어요.');
     if($('talk-log'))$('talk-log').hidden=false;
     if(typeof window.talkAnalyze==='function')window.talkAnalyze(snapshot,topic);
   };

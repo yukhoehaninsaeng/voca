@@ -65,9 +65,25 @@
     utterance.onerror=()=>{callState('error');avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
+  const SILENCE_KEY='vm-talk-silence-seconds-v1';
+  const clampSilence=value=>{const n=Number(value);return Number.isFinite(n)?Math.max(1.5,Math.min(7,Math.round(n*2)/2)):4;};
+  let silenceSeconds=4;
+  try{const stored=localStorage.getItem(SILENCE_KEY);if(stored!==null)silenceSeconds=clampSilence(stored);}catch(e){}
   function clearSilence(){if(silenceTimer){clearTimeout(silenceTimer);silenceTimer=null;}}
-  function scheduleSilence(){clearSilence();if(!autoTurn||!callActive||!listening||!heardSpeech)return;silenceTimer=setTimeout(()=>{silenceTimer=null;if(autoTurn&&callActive&&listening&&(finalized||interim))finishSpeech();},2300);}
-  window.talkSetAutoTurn=function(checked){autoTurn=Boolean(checked);if(!autoTurn)clearSilence();status(autoTurn?'자동 턴 전환 켜짐 · 말한 뒤 약 2.3초 멈추면 답변을 보냅니다.':'수동 턴 전환 · 말하기 완료를 눌러 전송하세요.');};
+  function scheduleSilence(){clearSilence();if(!autoTurn||!callActive||!listening||!heardSpeech)return;silenceTimer=setTimeout(()=>{silenceTimer=null;if(autoTurn&&callActive&&listening&&(finalized||interim))finishSpeech();},silenceSeconds*1000);}
+  window.talkSetSilence=function(value){
+    silenceSeconds=clampSilence(value);
+    const slider=$('talk-silence-seconds'),label=$('talk-silence-value');
+    if(slider)slider.value=String(silenceSeconds);
+    if(label)label.textContent=silenceSeconds.toFixed(1)+'초';
+    try{localStorage.setItem(SILENCE_KEY,String(silenceSeconds));}catch(e){}
+    if(autoTurn&&listening&&heardSpeech)scheduleSilence();
+    status('자동 턴 전환 대기 시간: '+silenceSeconds.toFixed(1)+'초');
+  };
+  window.talkSetAutoTurn=function(checked){
+    autoTurn=Boolean(checked);if(!autoTurn)clearSilence();else if(listening&&heardSpeech)scheduleSilence();
+    status(autoTurn?'자동 턴 전환 켜짐 · 말한 뒤 약 '+silenceSeconds.toFixed(1)+'초 멈추면 답변을 보냅니다.':'수동 턴 전환 · 말하기 완료를 눌러 전송하세요.');
+  };
   function updateTranscript(){
     const node=$('talk-live-transcript');
     if(node){node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();node.hidden=!captions;}
@@ -227,5 +243,5 @@
     if($('talk-log'))$('talk-log').hidden=false;
     if(typeof window.talkAnalyze==='function')window.talkAnalyze(snapshot,topic);
   };
-  window.addEventListener('DOMContentLoaded',()=>{refreshVoices();if(window.speechSynthesis){window.speechSynthesis.addEventListener?.('voiceschanged',refreshVoices);}const select=$('talk-voice');select?.addEventListener('change',()=>{localStorage.setItem(VOICE_KEY,select.value);});if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});
+  window.addEventListener('DOMContentLoaded',()=>{const slider=$('talk-silence-seconds'),label=$('talk-silence-value');if(slider)slider.value=String(silenceSeconds);if(label)label.textContent=silenceSeconds.toFixed(1)+'초';refreshVoices();if(window.speechSynthesis){window.speechSynthesis.addEventListener?.('voiceschanged',refreshVoices);}const select=$('talk-voice');select?.addEventListener('change',()=>{localStorage.setItem(VOICE_KEY,select.value);});if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});
 })();

@@ -107,25 +107,28 @@
 
   <!-- ② LEARN DASHBOARD -->
   <div class="screen on" id="s-learn">
+    <div class="home-welcome"><span class="home-eyebrow">MY ENGLISH JOURNEY</span><h1>오늘도 한 걸음씩 🦖</h1><p>어제보다 더 자연스럽게 말하는 하루</p></div>
     <section class="today-card" aria-labelledby="today-title">
       <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
       <p id="today-duration">오늘 약 0분</p>
       <div class="today-counts" id="today-counts">복습 0개 / 새 표현 0개</div>
+      <div class="home-progress-track" role="progressbar" aria-label="오늘 학습 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="home-progress-track"><span id="home-progress-fill"></span></div><div class="home-progress-label" id="home-progress-label">학습 준비 중</div>
       <label class="today-limit">오늘 공부할 개수<select id="todayItemLimit" onchange="changeTodayItemLimit(this.value)"><option value="5">5개</option><option value="10">10개</option><option value="15">15개</option><option value="20">20개</option></select></label>
       <button class="btn primary btn-wide today-primary" id="auto-start" onclick="startToday()">오늘 학습 시작</button>
       <button class="btn btn-wide" onclick="startToday(5)">오늘은 5분만</button>
       <details><summary>추천 이유</summary><div id="today-reasons"></div></details>
     </section>
     <section aria-labelledby="hub-title">
-      <div class="hub-heading"><h2 id="hub-title">목적별 학습</h2><span>원하는 연습으로 바로 이동</span></div>
+      <div class="hub-heading"><h2 id="hub-title">바로 학습하기</h2><span>나에게 필요한 연습</span></div>
       <div class="hub-grid">
         <button type="button" class="hub-tile" onclick="go('flash')"><span class="hub-icon" aria-hidden="true">📚</span><strong>단어 익히기</strong><small>플래시카드 · 발음 · 뜻</small></button>
         <button type="button" class="hub-tile" onclick="go('sent')"><span class="hub-icon" aria-hidden="true">✏️</span><strong>문장 연습</strong><small>빈칸 · 문장 구조 익히기</small></button>
         <button type="button" class="hub-tile" onclick="go('voice')"><span class="hub-icon" aria-hidden="true">🎙️</span><strong>스피킹</strong><small>토익 · 음성 말하기</small></button>
         <button type="button" class="hub-tile" onclick="go('quiz')"><span class="hub-icon" aria-hidden="true">🔁</span><strong>기억 확인</strong><small>객관식 · 틀린 표현 점검</small></button>
       </div>
-      <p class="hub-note">💡 AI 선생님과 자동 복습 고도화는 다음 단계에서 연결합니다. 현재는 기존 학습 기록과 채점 기능을 그대로 사용합니다.</p>
+      <div class="home-review-summary" aria-live="polite"><div><strong>🔁 오늘 복습</strong><p id="home-review-copy">복습할 표현을 확인하고 있어요.</p></div><button type="button" class="btn" onclick="startToday()">복습 포함 시작</button></div>
     </section>
+    <details class="home-advanced"><summary>학습 통계 · 자유 연습 모드 보기</summary>
     <div class="dash-summary">
       <div>
         <div class="dash-greeting" id="dash-greeting">오늘도 화이팅! 💪</div>
@@ -246,6 +249,7 @@
     </div>
   </div>
 
+    </details>
   <!-- ③ FLASH -->
   <div class="screen" id="s-flash">
     <div class="back-row"><button class="btn" style="padding:6px 12px;font-size:.72rem;" onclick="go('learn')">← 모드 선택</button><span class="back-label">🃏 플래시카드</span></div>

@@ -2,6 +2,7 @@
 (function(){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   let recognition=null, busy=false, history=[],topic='daily life',listening=false, sessionId=0;
+  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0;
   const $=id=>document.getElementById(id);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const status=message=>{if($('talk-status'))$('talk-status').textContent=message;};
@@ -23,25 +24,85 @@
     window.speechSynthesis.cancel();
     avatarState('speaking');
     const utterance=new SpeechSynthesisUtterance(message);
-    utterance.onboundary=()=>{const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth=avatar.dataset.mouth==='open'?'closed':'open';};
+    // No synthetic mouth overlay: preserve the supplied character image.
     utterance.lang='en-US';utterance.rate=0.85;utterance.pitch=1;
     utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';};
     utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
+  function updateTranscript(){
+    const node=$('talk-live-transcript');
+    if(node)node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();
+  }
+  function updateButton(){
+    const b=$('talk-mic');if(!b)return;
+    b.disabled=busy;
+    b.textContent=listening?'✓ 말하기 완료':'🎤 마이크로 말하기';
+    b.setAttribute('aria-pressed',String(listening));
+  }
+  function finishSpeech(){
+    if(!recognition||!listening)return;
+    manualStop=true;submitWhenStopped=true;
+    status('말하기를 마무리하고 있어요...');
+    try{recognition.stop();}catch(e){completeSpeech();}
+  }
+  function completeSpeech(){
+    const text=[finalized,interim].filter(Boolean).join(' ').trim();
+    listening=false;recognition=null;avatarState('idle');updateButton();
+    if(submitWhenStopped&&text)send(text);
+    else if(submitWhenStopped)status('인식된 문장이 없어요. 다시 말해 주세요.');
+    else if(text)status('음성 인식이 멈췄어요. 마이크를 눌러 이어서 말하거나 텍스트로 입력하세요.');
+    submitWhenStopped=false;manualStop=false;finalized='';interim='';
+    updateTranscript();
+  }
   function begin(){
     if(recognition||busy)return;
-    if(!SpeechRecognition){status('이 브라우저에서는 음성 인식을 지원하지 않아요. 아래 입력창을 사용해 주세요.');return;}
+    if(!SpeechRecognition){status('이 브라우저는 음성 인식을 지원하지 않아요. 텍스트 입력을 이용해 주세요.');return;}
+    window.speechSynthesis?.cancel();
+    finalized='';interim='';submitWhenStopped=false;manualStop=false;
+    const token=++recognitionToken;
     try{
-      window.speechSynthesis?.cancel();
-      recognition=new SpeechRecognition();recognition.lang='en-US';recognition.interimResults=false;recognition.continuous=false;
-      recognition.onresult=event=>{const text=event.results?.[0]?.[0]?.transcript?.trim();if(text)send(text);};
-      recognition.onerror=event=>{status(event.error==='not-allowed'?'마이크 권한을 허용해 주세요.':'음성을 인식하지 못했어요. 다시 시도해 주세요.');};
-      recognition.onend=()=>{recognition=null;listening=false;avatarState('idle');updateButton();};
-      recognition.start();listening=true;avatarState('listening');status('듣고 있어요. 영어로 말해 보세요.');updateButton();
-    }catch(e){recognition=null;listening=false;updateButton();status('마이크를 시작할 수 없어요. HTTPS 및 브라우저 권한을 확인해 주세요.');}
+      const rec=new SpeechRecognition();recognition=rec;
+      rec.lang='en-US';rec.interimResults=true;rec.continuous=true;
+      rec.onresult=event=>{
+        if(token!==recognitionToken)return;
+        // Chrome can revise interim hypotheses; final results are rebuilt by index.
+        const finals=[],partials=[];
+        for(let i=0;i<event.results.length;i++){
+          const phrase=event.results[i]?.[0]?.transcript?.trim();
+          if(!phrase)continue;
+          (event.results[i].isFinal?finals:partials).push(phrase);
+        }
+        finalized=finals.join(' ');interim=partials.join(' ');updateTranscript();
+      };
+      rec.onerror=event=>{
+        if(token!==recognitionToken)return;
+        if(event.error==='not-allowed'||event.error==='service-not-allowed'){
+          status('마이크 권한을 허용해 주세요.');submitWhenStopped=false;
+        }else if(event.error!=='no-speech'&&event.error!=='aborted'){
+          status('음성 인식 오류가 발생했어요. 다시 시도하거나 텍스트로 입력해 주세요.');
+        }
+      };
+      rec.onend=()=>{
+        if(token!==recognitionToken)return;
+        // Chrome may stop on silence despite continuous=true. Never auto-send.
+        // If the user explicitly finished, send the accumulated transcript.
+        if(!manualStop){
+          recognition=null;listening=false;avatarState('idle');updateButton();
+          if(finalized||interim){
+            const input=$('talk-input');
+            if(input)input.value=[finalized,interim].filter(Boolean).join(' ').trim();
+            status('잠시 인식이 멈췄어요. 이어 말하려면 마이크를 다시 누르세요. 완료했다면 입력창의 보내기를 누르세요.');
+          }else status('음성 인식이 종료됐어요. 마이크를 다시 눌러 주세요.');
+          return;
+        }
+        completeSpeech();
+      };
+      rec.start();listening=true;avatarState('listening');
+      status('듣고 있어요. 끝날 때 말하기 완료를 눌러 주세요.');
+      updateTranscript();updateButton();
+    }catch(e){recognition=null;listening=false;updateButton();status('마이크를 시작할 수 없어요. 권한을 확인해 주세요.');}
   }
-  function updateButton(){const b=$('talk-mic');if(b){b.disabled=busy;b.textContent=listening?'■ 듣기 중지':'🎤 마이크로 말하기';b.setAttribute('aria-pressed',String(listening));}}
   function offlineReply(text){
     const low=text.toLowerCase();
     if(low.includes('chicken')||low.includes('food'))return 'That sounds delicious! Do you like cooking at home?';
@@ -72,7 +133,7 @@
   }
   window.talkStart=function(){
     window.speechSynthesis?.cancel();
-    if(recognition){recognition.stop();return;}
+    if(recognition){finishSpeech();return;}
     begin();
   };
   window.talkSendText=function(){
@@ -82,7 +143,8 @@
   };
   window.talkReset=function(){
     sessionId++;
-    if(recognition){recognition.abort();recognition=null;}
+    recognitionToken++;if(recognition){recognition.abort();recognition=null;}
+    finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;history=[];
     topic=$('talk-topic')?.value||'daily life';
     if($('talk-log'))$('talk-log').textContent='';

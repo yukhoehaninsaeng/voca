@@ -20,36 +20,46 @@
     div.textContent=message;log.appendChild(div);log.scrollTop=log.scrollHeight;
   }
   const VOICE_KEY='vm-talk-voice-v1';
+  let callStartedAt=0,callClock=null;
   function englishVoices(){
     if(!window.speechSynthesis)return [];
     return window.speechSynthesis.getVoices().filter(v=>/^en([_-]|$)/i.test(v.lang));
   }
   function preferredVoice(voices){
     const saved=localStorage.getItem(VOICE_KEY);
-    if(saved){const found=voices.find(v=>v.voiceURI===saved);if(found)return found;}
-    const priority=[/samantha/i,/ava/i,/allison/i,/serena/i,/karen/i,/moira/i,/jenny/i,/aria/i,/zira/i,/female/i];
-    return voices.find(v=>priority.some(p=>p.test(v.name)))||voices.find(v=>/^en-US/i.test(v.lang)&&v.localService)||voices[0]||null;
+    if(saved&&saved!=='default'){const v=voices.find(x=>x.voiceURI===saved);if(v)return v;}
+    return null; // Let the browser select its natural default English voice.
   }
   function refreshVoices(){
     const select=$('talk-voice');if(!select)return;
-    const voices=englishVoices(),current=localStorage.getItem(VOICE_KEY);
+    const voices=englishVoices(),saved=localStorage.getItem(VOICE_KEY)||'default';
     select.replaceChildren();
-    if(!voices.length){const o=document.createElement('option');o.value='';o.textContent='기기 음성 로딩 중';select.append(o);return;}
+    const option=document.createElement('option');option.value='default';option.textContent='기본 목소리 (추천)';select.append(option);
     voices.forEach(v=>{const o=document.createElement('option');o.value=v.voiceURI;o.textContent=v.name+' ('+v.lang+')';select.append(o);});
-    select.value=voices.some(v=>v.voiceURI===current)?current:preferredVoice(voices)?.voiceURI||voices[0].voiceURI;
+    select.value=voices.some(v=>v.voiceURI===saved)?saved:'default';
   }
-  window.talkPreviewVoice=function(){speak('Hi! It is so nice to meet you. What would you like to talk about today?');};
-  function speak(message){
+  function callState(state,message){
+    const card=$('talk-call-panel');if(card)card.dataset.callState=state;
+    const label=$('talk-call-state');if(label)label.textContent=message||({idle:'통화 대기',speaking:'AI가 말하는 중',listening:'내 목소리를 듣는 중',thinking:'AI가 생각하는 중',error:'연결 확인 필요'}[state]||state);
+  }
+  function updateCallClock(){
+    const node=$('talk-call-clock');if(!node)return;
+    const elapsed=callStartedAt?Math.floor((Date.now()-callStartedAt)/1000):0;
+    node.textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+  }
+  function stopCallClock(){if(callClock){clearInterval(callClock);callClock=null;}callStartedAt=0;updateCallClock();}
+  window.talkPreviewVoice=function(){speak('Hi! It is nice to meet you. How are you today?',false);};
+  function speak(message,autoListen=true){
     if(!('speechSynthesis' in window)){status('음성 재생 미지원 · 텍스트를 확인해 주세요.');return;}
     window.speechSynthesis.cancel();
     avatarState('speaking');
     const utterance=new SpeechSynthesisUtterance(message);
     // No synthetic mouth overlay: preserve the supplied character image.
-    const voices=englishVoices();const selected=$('talk-voice')?.value;
-    const voice=voices.find(v=>v.voiceURI===selected)||preferredVoice(voices);
+    const voices=englishVoices();const voice=preferredVoice(voices);
     if(voice)utterance.voice=voice;
-    utterance.lang=voice?.lang||'en-US';utterance.rate=0.94;utterance.pitch=1.12;
-    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';if(callActive&&!busy&&!listening)begin();};
+    utterance.lang=voice?.lang||'en-US';utterance.rate=1;utterance.pitch=1;
+    callState('speaking');
+    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';if(autoListen&&callActive&&!busy&&!listening)begin();};
     utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
@@ -73,7 +83,7 @@
     const draft=$('talk-input')?.value.trim()||'';
     const text=[draft,finalized,interim].filter(Boolean).join(' ').trim();
     if($('talk-input'))$('talk-input').value='';
-    listening=false;recognition=null;avatarState('idle');updateButton();
+    listening=false;recognition=null;avatarState('idle');updateButton();callState('thinking');
     if(submitWhenStopped&&text)send(text);
     else if(submitWhenStopped)status('인식된 문장이 없어요. 다시 말해 주세요.');
     else if(text)status('음성 인식이 멈췄어요. 마이크를 눌러 이어서 말하거나 텍스트로 입력하세요.');
@@ -123,7 +133,7 @@
         }
         completeSpeech();
       };
-      rec.start();listening=true;avatarState('listening');
+      rec.start();listening=true;avatarState('listening');callState('listening');
       status('듣고 있어요. 끝날 때 말하기 완료를 눌러 주세요.');
       updateTranscript();updateButton();
     }catch(e){recognition=null;listening=false;updateButton();status('마이크를 시작할 수 없어요. 권한을 확인해 주세요.');}
@@ -137,7 +147,7 @@
   }
   async function send(text){
     if(busy||!text.trim())return;
-    busy=true;const requestSession=sessionId;avatarState('thinking');updateButton();bubble('user',text.trim());
+    busy=true;const requestSession=sessionId;avatarState('thinking');callState('thinking');updateButton();bubble('user',text.trim());
     history.push({role:'user',content:text.trim().slice(0,700)});
     status('답변을 준비하고 있어요...');
     let reply;
@@ -153,7 +163,7 @@
       if(hasKey){
         status('AI 응답 실패 · 키, 모델, 사용 한도 또는 네트워크를 확인해 주세요. 자동으로 가짜 AI 답변을 생성하지 않습니다.');
         if($('talk-mode'))$('talk-mode').textContent='AI 연결 오류';
-        busy=false;avatarState('idle');updateButton();return;
+        busy=false;avatarState('idle');callState('error');updateButton();return;
       }
       reply=offlineReply(text);
       status('AI 키 미설정 · 기본 연습 응답입니다. 마이에서 키를 등록해 주세요.');
@@ -165,7 +175,8 @@
   }
   window.talkBeginCall=function(){
     if(callActive)return;
-    callActive=true;const log=$('talk-log');if(log)log.hidden=!captions;
+    callActive=true;callStartedAt=Date.now();updateCallClock();if(callClock)clearInterval(callClock);callClock=setInterval(updateCallClock,1000);
+    const log=$('talk-log');if(log)log.hidden=!captions;
     const greeting=opening[topic]||opening['daily life'];
     status('AI 친구가 먼저 말을 걸어요. 질문이 끝나면 마이크가 자동으로 켜집니다.');
     speak(greeting);
@@ -179,7 +190,7 @@
   window.talkStart=function(){
     window.speechSynthesis?.cancel();
     if(recognition){finishSpeech();return;}
-    if(!callActive){callActive=true;}
+    if(!callActive){callActive=true;callStartedAt=Date.now();updateCallClock();callClock=setInterval(updateCallClock,1000);}
     begin();
   };
   window.talkSendText=function(){
@@ -188,7 +199,7 @@
     input.value='';send(value);
   };
   window.talkReset=function(){
-    sessionId++;callActive=false;
+    sessionId++;callActive=false;stopCallClock();callState('idle');
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
     if($('talk-input'))$('talk-input').value='';
@@ -199,10 +210,10 @@
     const greeting=opening[topic]||opening['daily life'];
     bubble('assistant',greeting);history.push({role:'assistant',content:greeting});
     if($('talk-log'))$('talk-log').hidden=!captions;
-    status('음성 대화 시작을 눌러 AI 친구의 첫 질문을 들어 보세요.');updateButton();
+    callState('idle');status('음성 대화 시작을 눌러 AI 친구의 첫 질문을 들어 보세요.');updateButton();
   };
   window.talkStop=function(){
-    const snapshot=history.map(m=>({...m}));sessionId++;callActive=false;
+    const snapshot=history.map(m=>({...m}));sessionId++;callActive=false;stopCallClock();callState('idle');
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;updateButton();status('대화를 종료했어요.');
     if($('talk-log'))$('talk-log').hidden=false;

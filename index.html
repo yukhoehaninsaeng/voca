@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="css/mascot-call.css">
 <link rel="stylesheet" href="css/talk-coach.css">
 <link rel="stylesheet" href="css/voca-user-data.css">
+<link rel="stylesheet" href="css/sentence-retrieval.css">
 </head>
 <body>
 
@@ -278,9 +279,24 @@
 <div class="talk-controls"><button class="btn" type="button" onclick="talkReset()">새 대화</button><button class="btn" type="button" onclick="talkStop()">대화 종료 · 피드백</button></div><section id="talk-feedback" class="talk-feedback" aria-live="polite" hidden></section><section class="talk-history-panel"><h3>지난 대화 기록</h3><div id="talk-history-list"></div></section></div>
 <p class="hub-ai-disclaimer">실제 영상통화가 아닌 마이크 입력과 음성 재생 방식입니다. AI 응답은 마이 페이지에서 등록한 OpenAI 또는 Anthropic 키를 사용합니다. AI 키가 없으면 기본 연습 모드로 동작합니다. 음성 인식 지원은 브라우저에 따라 다릅니다.</p>
 </section>
+<section class="screen hub-screen" id="s-retrieval" aria-labelledby="retrieval-title">
+<div class="hub-page-title"><span>SPEAKING AUTOMATION</span><h1 id="retrieval-title">순간 문장 만들기</h1><p>아는 단어를 실제 영어 문장으로 꺼내는 연습</p></div>
+<div class="card retrieval-card">
+<div class="retrieval-heading"><strong>오늘의 문장 인출 훈련</strong><span>PHASE 1</span></div>
+<p class="retrieval-guide">한국어 상황을 보고 먼저 영어로 말해 보세요. 완벽한 정답보다 스스로 꺼내는 과정이 중요해요.</p>
+<div class="retrieval-question"><small>영어로 어떻게 말할까요?</small><h2 id="retrieval-prompt">문제를 준비하고 있어요.</h2></div>
+<p class="retrieval-pattern"><strong>오늘의 패턴:</strong> <span id="retrieval-pattern"></span></p>
+<div class="retrieval-entry"><input id="retrieval-input" type="text" autocomplete="off" placeholder="영어로 말하거나 입력해 보세요" aria-label="영어 답변"><button class="btn" id="retrieval-mic" type="button">🎤 말하기</button></div>
+<div id="retrieval-hint" class="retrieval-hint" aria-live="polite"></div>
+<div class="retrieval-actions"><button class="btn" id="retrieval-hint-button" type="button">힌트 한 단계</button><button class="btn primary" id="retrieval-check" type="button">답변 확인</button></div>
+<div id="retrieval-answer" class="retrieval-answer" aria-live="polite" hidden></div>
+<div id="retrieval-grade" class="retrieval-grade" hidden><p>의미가 전달되는 문장을 스스로 만들었나요?</p><button class="btn primary" id="retrieval-correct" type="button">✓ 스스로 말했어요</button><button class="btn" id="retrieval-retry" type="button">다시 연습할래요</button></div>
+<p id="retrieval-status" role="status" class="retrieval-status"></p><p id="retrieval-stats" class="retrieval-stats"></p>
+<button class="btn" id="retrieval-next" type="button">다른 문장으로 넘어가기</button>
+</div></section>
 <section class="screen hub-screen" id="s-teacher" aria-labelledby="teacher-title">
     <div class="hub-page-title"><span>AI TEACHER</span><h1 id="teacher-title">영어 선생님</h1><p>내 문장을 연습하고 필요한 부분을 확인해요.</p></div>
-    <div class="talk-entry"><button type="button" class="btn primary btn-wide" onclick="go('talk')">🎤 AI와 프리토킹 시작</button></div><div class="hub-teacher-card"><strong>오늘의 문장 연습</strong><p>아래 한국어 문장을 영어로 만들어 보세요.</p><div class="teacher-question" id="teacher-question">나는 운동하는 것을 좋아한다.</div><textarea id="teacher-answer" rows="3" placeholder="영어 문장을 입력해 보세요." aria-label="영어 문장 답변"></textarea><div class="teacher-actions"><button type="button" class="btn" onclick="nextTeacherPrompt()">다음 문제</button><button type="button" class="btn primary" onclick="checkTeacherAnswer()">정답 확인</button></div><div class="teacher-feedback" id="teacher-feedback" role="status" aria-live="polite"></div></div>
+    <div class="talk-entry"><button type="button" class="btn primary btn-wide" onclick="go('retrieval')">⚡ 순간 문장 만들기</button><button type="button" class="btn btn-wide" onclick="go('talk')">🎤 AI와 프리토킹 시작</button></div><div class="hub-teacher-card"><strong>오늘의 문장 연습</strong><p>아래 한국어 문장을 영어로 만들어 보세요.</p><div class="teacher-question" id="teacher-question">나는 운동하는 것을 좋아한다.</div><textarea id="teacher-answer" rows="3" placeholder="영어 문장을 입력해 보세요." aria-label="영어 문장 답변"></textarea><div class="teacher-actions"><button type="button" class="btn" onclick="nextTeacherPrompt()">다음 문제</button><button type="button" class="btn primary" onclick="checkTeacherAnswer()">정답 확인</button></div><div class="teacher-feedback" id="teacher-feedback" role="status" aria-live="polite"></div></div>
     <p class="hub-ai-disclaimer">현재는 기초 문장 패턴 연습 기능입니다. 생성형 AI 대화·자유 문장 채점은 아직 연결되지 않았어요. 이 화면의 정답 확인은 학습 기록에 반영되지 않습니다.</p>
   </section>
   <!-- ③ FLASH -->
@@ -408,6 +424,7 @@
 <script src="js/app.js"></script>
 <script src="js/mobile-hub-fixes.js"></script>
 <script src="js/free-talk.js"></script>
+<script src="js/sentence-retrieval.js"></script>
 
 <script src="js/talk-coach.js"></script>
 <script src="js/voca-user-data.js"></script>

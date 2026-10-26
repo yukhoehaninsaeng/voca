@@ -2,7 +2,7 @@
 (function(){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   let recognition=null, busy=false, history=[],topic='daily life',listening=false, sessionId=0;
-  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0,callActive=false,captions=false,autoTurn=false,silenceTimer=null,heardSpeech=false;
+  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0,callActive=false,captions=false,autoTurn=false,silenceTimer=null,heardSpeech=false,sttChunks=[],pendingReview=false,recognitionRestartTimer=null;
   const $=id=>document.getElementById(id);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const status=message=>{if($('talk-status'))$('talk-status').textContent=message;};
@@ -70,6 +70,16 @@
   let silenceSeconds=4;
   try{const stored=localStorage.getItem(SILENCE_KEY);if(stored!==null)silenceSeconds=clampSilence(stored);}catch(e){}
   function clearSilence(){if(silenceTimer){clearTimeout(silenceTimer);silenceTimer=null;}}
+  function clearRestart(){if(recognitionRestartTimer){clearTimeout(recognitionRestartTimer);recognitionRestartTimer=null;}}
+  const transcriptText=()=>[...sttChunks,finalized,interim].filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+  function showReview(text){
+    const panel=$('talk-stt-review'),input=$('talk-stt-edit');if(!panel||!input)return false;
+    input.value=text;panel.hidden=false;pendingReview=true;callState('idle','인식 결과 확인 중');
+    status('음성인식 결과를 확인하고, 틀린 단어를 수정한 뒤 전송하세요.');return true;
+  }
+  function hideReview(){pendingReview=false;const panel=$('talk-stt-review');if(panel)panel.hidden=true;}
+  window.talkConfirmTranscript=function(){const text=$('talk-stt-edit')?.value.trim()||'';if(!text){status('전송할 문장을 입력해 주세요.');return;}hideReview();send(text);};
+  window.talkRetryTranscript=function(){hideReview();sttChunks=[];finalized='';interim='';heardSpeech=false;updateTranscript();begin();};
   function scheduleSilence(){clearSilence();if(!autoTurn||!callActive||!listening||!heardSpeech)return;silenceTimer=setTimeout(()=>{silenceTimer=null;if(autoTurn&&callActive&&listening&&(finalized||interim))finishSpeech();},silenceSeconds*1000);}
   window.talkSetSilence=function(value){
     silenceSeconds=clampSilence(value);
@@ -86,7 +96,7 @@
   };
   function updateTranscript(){
     const node=$('talk-live-transcript');
-    if(node){node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();node.hidden=!captions;}
+    if(node){node.textContent=transcriptText();node.hidden=!captions;}
   }
   function updateButton(){
     const b=$('talk-mic');if(!b)return;
@@ -102,20 +112,20 @@
   }
   function completeSpeech(){
     const draft=$('talk-input')?.value.trim()||'';
-    const text=[draft,finalized,interim].filter(Boolean).join(' ').trim();
+    const text=[draft,transcriptText()].filter(Boolean).join(' ').trim();
     if($('talk-input'))$('talk-input').value='';
     listening=false;recognition=null;avatarState('idle');updateButton();callState('thinking');
-    if(submitWhenStopped&&text)send(text);
+    if(submitWhenStopped&&text){if(!showReview(text))send(text);}
     else if(submitWhenStopped)status('인식된 문장이 없어요. 다시 말해 주세요.');
     else if(text)status('음성 인식이 멈췄어요. 마이크를 눌러 이어서 말하거나 텍스트로 입력하세요.');
-    submitWhenStopped=false;manualStop=false;finalized='';interim='';
+    submitWhenStopped=false;manualStop=false;sttChunks=[];finalized='';interim='';
     updateTranscript();
   }
-  function begin(){
-    if(recognition||busy)return;
+  function begin(resuming=false){
+    if(recognition||busy||pendingReview)return;
     if(!SpeechRecognition){status('이 브라우저는 음성 인식을 지원하지 않아요. 텍스트 입력을 이용해 주세요.');return;}
     window.speechSynthesis?.cancel();
-    clearSilence();heardSpeech=false;finalized='';interim='';submitWhenStopped=false;manualStop=false;
+    clearSilence();clearRestart();if(!resuming)sttChunks=[];heardSpeech=Boolean(transcriptText());finalized='';interim='';submitWhenStopped=false;manualStop=false;
     const token=++recognitionToken;
     try{
       const rec=new SpeechRecognition();recognition=rec;
@@ -129,7 +139,7 @@
           if(!phrase)continue;
           (event.results[i].isFinal?finals:partials).push(phrase);
         }
-        finalized=finals.join(' ');interim=partials.join(' ');heardSpeech=Boolean(finalized||interim);updateTranscript();scheduleSilence();
+        finalized=finals.join(' ');interim=partials.join(' ');heardSpeech=Boolean(transcriptText());updateTranscript();scheduleSilence();
       };
       rec.onerror=event=>{
         if(token!==recognitionToken)return;
@@ -142,15 +152,17 @@
       rec.onend=()=>{
         if(token!==recognitionToken)return;
         clearSilence();
-        if(!manualStop&&autoTurn&&callActive&&(finalized||interim)){submitWhenStopped=true;manualStop=true;}
-        // Chrome may stop on silence despite continuous=true. Never auto-send.
-        // If the user explicitly finished, send the accumulated transcript.
         if(!manualStop){
-          recognition=null;listening=false;avatarState('idle');updateButton();
-          if(finalized||interim){
-            const input=$('talk-input');
-            if(input)input.value=[input.value.trim(),finalized,interim].filter(Boolean).join(' ').trim();
-            status('잠시 인식이 멈췄어요. 이어 말하려면 마이크를 다시 누르세요. 완료했다면 입력창의 보내기를 누르세요.');
+          // Browsers may end recognition on a brief pause. Preserve text and
+          // restart without sending prematurely when auto-turn is enabled.
+          if(finalized||interim)sttChunks.push([finalized,interim].filter(Boolean).join(' '));
+          finalized='';interim='';recognition=null;listening=false;heardSpeech=Boolean(transcriptText());
+          avatarState('idle');updateButton();updateTranscript();
+          if(autoTurn&&callActive&&heardSpeech){
+            status('잠시 인식이 끊겼어요. 앞 문장을 보존하고 다시 듣습니다.');
+            recognitionRestartTimer=setTimeout(()=>{recognitionRestartTimer=null;if(callActive&&!busy&&!pendingReview)begin(true);},250);
+          }else if(heardSpeech){
+            showReview(transcriptText());sttChunks=[];updateTranscript();
           }else status('음성 인식이 종료됐어요. 마이크를 다시 눌러 주세요.');
           return;
         }
@@ -213,16 +225,17 @@
   window.talkStart=function(){
     window.speechSynthesis?.cancel();
     if(recognition){finishSpeech();return;}
+    if(pendingReview){status('먼저 인식된 문장을 확인하거나 다시 말하기를 선택해 주세요.');return;}
     if(!callActive){callActive=true;callStartedAt=Date.now();updateCallClock();callClock=setInterval(updateCallClock,1000);}
     begin();
   };
   window.talkSendText=function(){
     const input=$('talk-input');if(!input)return;
     const value=input.value.trim();if(!value)return;
-    input.value='';send(value);
+    input.value='';hideReview();send(value);
   };
   window.talkReset=function(){
-    clearSilence();sessionId++;callActive=false;stopCallClock();callState('idle');
+    clearSilence();clearRestart();hideReview();sttChunks=[];sessionId++;callActive=false;stopCallClock();callState('idle');
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
     if($('talk-input'))$('talk-input').value='';
@@ -236,7 +249,7 @@
     callState('idle');status('음성 대화 시작을 눌러 AI 친구의 첫 질문을 들어 보세요.');updateButton();
   };
   window.talkStop=function(){
-    const snapshot=history.map(m=>({...m}));clearSilence();sessionId++;callActive=false;stopCallClock();callState('idle');
+    const snapshot=history.map(m=>({...m}));clearSilence();clearRestart();hideReview();sttChunks=[];sessionId++;callActive=false;stopCallClock();callState('idle');
     window.dispatchEvent(new CustomEvent('voca-conversation-finished',{detail:{topic,history:snapshot}}));
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;updateButton();status('대화를 종료했어요.');

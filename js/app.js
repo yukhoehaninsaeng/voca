@@ -220,9 +220,10 @@ function switchInputMode(m){
 
 /* ─── NAV ────────────────────────────────────────────── */
 function go(tab){
-  if(tab==='input'||tab==='learn'||tab==='profile'){words=ownedWords;sents=ownedSents;selectedStudyItems=null;}
-  document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['learn','input','profile'][i]===tab));
-  document.querySelectorAll('.tnav-btn').forEach((b,i)=>b.classList.toggle('active',['input','learn','profile'][i]===tab));
+  if(['input','learn','profile','courses','teacher','review'].includes(tab)){words=ownedWords;sents=ownedSents;selectedStudyItems=null;}
+  const navTab=tab==='input'||['flash','quiz','type','sent','toeic','voice'].includes(tab)?'courses':tab;
+  document.querySelectorAll('.bnav-btn').forEach(b=>{const active=b.dataset.nav===navTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
+  document.querySelectorAll('.tnav-btn').forEach(b=>{const active=b.dataset.nav===navTab;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
   const target=document.getElementById('s-'+tab);if(!target)return;
   target.classList.add('on');
@@ -237,8 +238,62 @@ function go(tab){
   if(tab==='toeic')initToeic();
   if(tab==='voice')initVoice();
   if(tab==='profile')renderProfile();
+  if(tab==='review')renderReviewScreen();
+  if(tab==='teacher')renderTeacherScreen();
 }
 
+/* ─── MOBILE LEARNING HUB ────────────────────────────── */
+function renderReviewScreen(){
+  const plan=ensureTodayPlan();
+  const tasks=Array.isArray(plan.steps)?plan.steps.filter(step=>step.taskType==='review'||step.reason?.includes('복습')):[];
+  const completed=new Set(Object.values(dailySession?.results||{}).map(x=>x?.taskId).filter(Boolean));
+  const remaining=tasks.filter(step=>!completed.has(step.taskId));
+  const count=document.getElementById('review-due-count'),detail=document.getElementById('review-due-detail'),button=document.getElementById('review-start');
+  if(count)count.textContent=remaining.length+'개';
+  if(detail)detail.textContent=remaining.length?'오늘의 학습 계획에 포함된 복습 항목입니다.':'예정된 복습이 없다면 자유 퀴즈로 연습할 수 있어요.';
+  if(button)button.disabled=!remaining.length;
+}
+function startReviewSession(){
+  const plan=ensureTodayPlan();
+  const completed=new Set(Object.values(dailySession?.results||{}).map(x=>x?.taskId).filter(Boolean));
+  const reviewSteps=(plan.steps||[]).filter(step=>(step.taskType==='review'||step.reason?.includes('복습'))&&!completed.has(step.taskId));
+  if(!reviewSteps.length){renderReviewScreen();return;}
+  const mode=reviewSteps[0].mode,ids=new Set(reviewSteps.filter(step=>step.mode===mode).map(step=>step.itemId));
+  const items=catalog.items.filter(item=>ids.has(item.id));
+  if(!items.length){renderReviewScreen();return;}
+  selectedStudyItems=items;
+  if(['flash','type'].includes(mode)){words=items.map(item=>({word:item.en,meaning:item.ko,_itemId:item.id,_itemType:item.type}));errCount={};go(mode);return;}
+  sents=items.map(item=>({en:item.en,ko:item.ko,_itemId:item.id}));sErrCount={};
+  setSentModeAndGo(mode,'user');
+}
+const teacherPrompts=[
+  {ko:'나는 운동하는 것을 좋아한다.',en:'I like working out.',tip:'like + 동사-ing'},
+  {ko:'나는 TV를 보고 싶다.',en:'I want to watch TV.',tip:'want to + 동사원형'},
+  {ko:'우리는 함께 저녁을 먹는다.',en:'We eat dinner together.',tip:'일반동사 앞에 불필요한 are를 넣지 않아요.'},
+  {ko:'그것은 단백질이 많다.',en:'It has a lot of protein.',tip:'It + has'},
+  {ko:'그것은 만들기 쉽다.',en:"It's easy to make.",tip:"It's + 형용사 + to + 동사원형"}
+];
+let teacherPromptIndex=0;
+function renderTeacherScreen(){
+  const q=document.getElementById('teacher-question');
+  if(q)q.textContent=teacherPrompts[teacherPromptIndex].ko;
+}
+function nextTeacherPrompt(){
+  teacherPromptIndex=(teacherPromptIndex+1)%teacherPrompts.length;
+  renderTeacherScreen();
+  const answer=document.getElementById('teacher-answer'),feedback=document.getElementById('teacher-feedback');
+  if(answer)answer.value='';
+  if(feedback)feedback.textContent='';
+}
+function checkTeacherAnswer(){
+  const answer=document.getElementById('teacher-answer')?.value.trim(),feedback=document.getElementById('teacher-feedback');
+  if(!feedback)return;
+  if(!answer){feedback.textContent='먼저 영어 문장을 입력해 주세요.';return;}
+  const prompt=teacherPrompts[teacherPromptIndex];
+  const normalize=x=>x.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\\s+/g,' ').trim();
+  const exact=normalize(answer)===normalize(prompt.en);
+  feedback.textContent=(exact?'예시 정답과 일치해요! ':'예시 정답과 비교해 보세요. ')+'정답 예시: '+prompt.en+' · 포인트: '+prompt.tip;
+}
 /* ─── DASHBOARD ──────────────────────────────────────── */
 function repeatCount(){return Object.entries(errCount).filter(([key,value])=>!key.startsWith('__w__')&&value>0).length;}
 
@@ -1017,7 +1072,22 @@ function ensureTodayPlan(minutes){
   if(!dailySession||dailySession.planId!==dailyPlan.planId)dailySession=VocabCore.createSession(dailyPlan);
   return dailyPlan;
 }
-function renderTodayPlan(){const plan=ensureTodayPlan(),limit=document.getElementById('todayItemLimit');if(limit)limit.value=String(plan.itemLimit||10);const minutes=Math.max(1,Math.ceil(plan.estimatedSeconds/60));document.getElementById('today-duration').textContent=`오늘 약 ${minutes}분`;document.getElementById('today-counts').textContent=`복습 ${plan.counts.review}개 / 새 표현 ${plan.counts.new}개${plan.remainingReviewCount?` / 추가 복습 ${plan.remainingReviewCount}개`:''}`;document.getElementById('today-reasons').textContent=[...new Set(plan.steps.map(step=>step.reason))].join(' · ')||'학습 항목을 보관함에 추가하면 자동으로 계획해요.';const button=document.getElementById('auto-start');button.textContent=dailySession&&!dailySession.completed&&dailySession.cursor>0?'이어하기':'오늘 학습 시작';button.disabled=!plan.steps.length;}
+function renderTodayPlan(){const plan=ensureTodayPlan(),limit=document.getElementById('todayItemLimit');if(limit)limit.value=String(plan.itemLimit||10);const minutes=Math.max(1,Math.ceil(plan.estimatedSeconds/60));document.getElementById('today-duration').textContent=`오늘 약 ${minutes}분`;document.getElementById('today-counts').textContent=`복습 ${plan.counts.review}개 / 새 표현 ${plan.counts.new}개${plan.remainingReviewCount?` / 추가 복습 ${plan.remainingReviewCount}개`:''}`;document.getElementById('today-reasons').textContent=[...new Set(plan.steps.map(step=>step.reason))].join(' · ')||'학습 항목을 보관함에 추가하면 자동으로 계획해요.';const button=document.getElementById('auto-start');button.textContent=dailySession&&!dailySession.completed&&dailySession.cursor>0?'이어하기':'오늘 학습 시작';button.disabled=!plan.steps.length;renderHomeProgress();}
+function renderHomeProgress(){
+  const plan=dailyPlan;
+  const steps=Array.isArray(plan?.steps)?plan.steps:[];
+  const completed=new Set(Object.values(dailySession?.results||{}).map(result=>result?.taskId).filter(Boolean));
+  const done=steps.filter(step=>completed.has(step.taskId)).length;
+  const percent=steps.length?Math.round(done/steps.length*100):0;
+  const track=document.getElementById('home-progress-track');
+  const fill=document.getElementById('home-progress-fill');
+  const label=document.getElementById('home-progress-label');
+  const review=document.getElementById('home-review-copy');
+  if(track)track.setAttribute('aria-valuenow',String(percent));
+  if(fill)fill.style.width=percent+'%';
+  if(label)label.textContent=steps.length?`오늘 학습 ${done}/${steps.length}단계 · ${percent}%`:'학습할 표현을 준비해 주세요';
+  if(review)review.textContent=plan?`복습 ${plan.counts?.review||0}개 · 새 표현 ${plan.counts?.new||0}개`:'오늘의 학습 계획을 준비해요';
+}
 function changeTodayItemLimit(value){const count=Number(value);if(![5,10,15,20].includes(count))return;userProfile={...(userProfile||{}),dailyItemLimit:count,dailyMinutes:userProfile?.dailyMinutes||15,timezone:userProfile?.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone};dailyPlan=null;dailySession=null;persistV2();renderTodayPlan();}
 function toeicSpeakingLevel(score){if(!Number.isFinite(score))return{code:'미설정',label:'TOEIC Speaking 점수를 입력하세요'};if(score>=200)return{code:'AH',label:'Advanced High'};if(score>=180)return{code:'AM',label:'Advanced Mid'};if(score>=160)return{code:'AL',label:'Advanced Low'};if(score>=140)return{code:'IH',label:'Intermediate High'};if(score>=110)return{code:'IM',label:'Intermediate Mid'};if(score>=90)return{code:'IL',label:'Intermediate Low'};if(score>=60)return{code:'NH',label:'Novice High'};return{code:'NM/NL',label:'Novice Mid / Low'};}
 function renderProfile(){const metrics=VocabCore.selectLearningMetrics(studyEvents,progressById),storedScore=userProfile?.toeicSpeakingScore,parsedScore=Number(storedScore),score=storedScore===null||storedScore===undefined||!Number.isFinite(parsedScore)?null:parsedScore,level=toeicSpeakingLevel(score);document.getElementById('metric-studied').textContent=metrics.studiedItems;document.getElementById('metric-mastered').textContent=metrics.masteredItems;document.getElementById('metric-days').textContent=metrics.studyDays;document.getElementById('metric-streak').textContent=metrics.currentStreak;document.getElementById('metric-recent-attempts').textContent=metrics.recentAttempts;document.getElementById('metric-recent-accuracy').textContent=metrics.recentAccuracy===null?'-':`${metrics.recentAccuracy}%`;document.getElementById('metric-total').textContent=`누적 시도 ${metrics.totalAttempts}회 · 정답 ${metrics.totalCorrect}회`;document.getElementById('profile-level-badge').textContent=score===null?'토스 미설정':`${level.code} · ${score}점`;document.getElementById('settingsItemLimit').value=String(userProfile?.dailyItemLimit||10);document.getElementById('settingsToeicScore').value=score===null?'':String(score);document.getElementById('toeicLevelGuide').textContent=score===null?'최근 공식 성적표의 점수를 입력하세요. 점수는 자기 설정 단계에만 사용됩니다.':`${level.code} · ${level.label} — 입력한 ${score}점 기준`;}

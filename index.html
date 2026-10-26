@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#0f0f13"/>
+<meta name="theme-color" content="#fbf7f0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<title>VocabMaster</title>
+<title>VocaMate · 오늘의 영어 학습</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/mobile-hub.css">
+<link rel="stylesheet" href="css/learning-tabs.css">
 </head>
 <body>
 
@@ -40,8 +42,8 @@
 <div class="page-wrap">
   <header>
     <div>
-      <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노 단어 학습</span>
+      <div class="logo">VocaMate</div>
+      <span class="logo-sub">🦖 오늘도 영어 한 걸음</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -54,11 +56,7 @@
     </div>
   </header>
 
-  <nav class="top-nav">
-    <button class="tnav-btn" onclick="go('input')">📚 보관함</button>
-    <button class="tnav-btn active" onclick="go('learn')">☀️ 오늘</button>
-    <button class="tnav-btn" onclick="go('profile')">👤 마이</button>
-  </nav>
+  <nav class="top-nav" aria-label="데스크톱 주요 메뉴"><button class="tnav-btn active" data-nav="learn" onclick="go('learn')">🏠 홈</button><button class="tnav-btn" data-nav="courses" onclick="go('courses')">📖 학습</button><button class="tnav-btn" data-nav="teacher" onclick="go('teacher')">💬 AI 선생님</button><button class="tnav-btn" data-nav="review" onclick="go('review')">🔁 복습</button><button class="tnav-btn" data-nav="profile" onclick="go('profile')">👤 마이</button></nav>
 
   <!-- ① INPUT -->
   <div class="screen" id="s-input">
@@ -106,15 +104,28 @@
 
   <!-- ② LEARN DASHBOARD -->
   <div class="screen on" id="s-learn">
+    <div class="home-welcome"><span class="home-eyebrow">MY ENGLISH JOURNEY</span><h1>오늘도 한 걸음씩 🦖</h1><p>어제보다 더 자연스럽게 말하는 하루</p></div>
     <section class="today-card" aria-labelledby="today-title">
       <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
       <p id="today-duration">오늘 약 0분</p>
       <div class="today-counts" id="today-counts">복습 0개 / 새 표현 0개</div>
+      <div class="home-progress-track" role="progressbar" aria-label="오늘 학습 진행률" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="home-progress-track"><span id="home-progress-fill"></span></div><div class="home-progress-label" id="home-progress-label">학습 준비 중</div>
       <label class="today-limit">오늘 공부할 개수<select id="todayItemLimit" onchange="changeTodayItemLimit(this.value)"><option value="5">5개</option><option value="10">10개</option><option value="15">15개</option><option value="20">20개</option></select></label>
       <button class="btn primary btn-wide today-primary" id="auto-start" onclick="startToday()">오늘 학습 시작</button>
       <button class="btn btn-wide" onclick="startToday(5)">오늘은 5분만</button>
       <details><summary>추천 이유</summary><div id="today-reasons"></div></details>
     </section>
+    <section aria-labelledby="hub-title">
+      <div class="hub-heading"><h2 id="hub-title">바로 학습하기</h2><span>나에게 필요한 연습</span></div>
+      <div class="hub-grid">
+        <button type="button" class="hub-tile" onclick="go('flash')"><span class="hub-icon" aria-hidden="true">📚</span><strong>단어 익히기</strong><small>플래시카드 · 발음 · 뜻</small></button>
+        <button type="button" class="hub-tile" onclick="go('sent')"><span class="hub-icon" aria-hidden="true">✏️</span><strong>문장 연습</strong><small>빈칸 · 문장 구조 익히기</small></button>
+        <button type="button" class="hub-tile" onclick="go('voice')"><span class="hub-icon" aria-hidden="true">🎙️</span><strong>스피킹</strong><small>토익 · 음성 말하기</small></button>
+        <button type="button" class="hub-tile" onclick="go('quiz')"><span class="hub-icon" aria-hidden="true">🔁</span><strong>기억 확인</strong><small>객관식 · 틀린 표현 점검</small></button>
+      </div>
+      <div class="home-review-summary" aria-live="polite"><div><strong>🔁 오늘 복습</strong><p id="home-review-copy">복습할 표현을 확인하고 있어요.</p></div><button type="button" class="btn" onclick="startToday()">복습 포함 시작</button></div>
+    </section>
+    <details class="home-advanced"><summary>학습 통계 · 자유 연습 모드 보기</summary>
     <div class="dash-summary">
       <div>
         <div class="dash-greeting" id="dash-greeting">오늘도 화이팅! 💪</div>
@@ -233,8 +244,30 @@
         </div>
       </div>
     </div>
+    </details>
   </div>
 
+  <!-- Integrated learning navigation -->
+  <section class="screen hub-screen" id="s-courses" aria-labelledby="courses-title">
+    <div class="hub-page-title"><span>LEARNING</span><h1 id="courses-title">어떤 영어를 연습할까요?</h1><p>단어부터 말하기까지 하나씩 이어서 학습해요.</p></div>
+    <div class="hub-course-list">
+      <button type="button" onclick="go('flash')"><span>📚</span><div><strong>단어 익히기</strong><small>뜻을 익히고 기억을 확인해요</small></div><b>›</b></button>
+      <button type="button" onclick="go('sent')"><span>✏️</span><div><strong>문장 만들기</strong><small>영어 문장 구조를 연습해요</small></div><b>›</b></button>
+      <button type="button" onclick="go('voice')"><span>🎤</span><div><strong>말하기 연습</strong><small>기존 음성 인식 모드를 사용해요</small></div><b>›</b></button>
+      <button type="button" onclick="go('toeic')"><span>🎯</span><div><strong>TOEIC Speaking</strong><small>시험 문장으로 실전 연습해요</small></div><b>›</b></button>
+      <button type="button" onclick="go('input')"><span>🗂️</span><div><strong>내 단어·문장 보관함</strong><small>직접 표현을 추가하고 관리해요</small></div><b>›</b></button>
+    </div>
+  </section>
+  <section class="screen hub-screen" id="s-review" aria-labelledby="review-title">
+    <div class="hub-page-title"><span>SPACED REPETITION</span><h1 id="review-title">복습하기</h1><p>기억이 흐려질 때 다시 만나도록 준비했어요.</p></div>
+    <div class="hub-review-card"><strong id="review-due-count">0개</strong><p>오늘 복습 예정인 표현</p><div id="review-due-detail">학습 기록을 확인하고 있어요.</div><button class="btn primary btn-wide" type="button" id="review-start" onclick="startReviewSession()">복습 시작</button></div>
+    <div class="hub-course-list"><button type="button" onclick="go('quiz')"><span>🧠</span><div><strong>자유 단어 퀴즈</strong><small>보관함의 단어로 추가 연습</small></div><b>›</b></button><button type="button" onclick="go('profile')"><span>📊</span><div><strong>학습 기록 확인</strong><small>정확도와 학습한 날을 확인해요</small></div><b>›</b></button></div>
+  </section>
+  <section class="screen hub-screen" id="s-teacher" aria-labelledby="teacher-title">
+    <div class="hub-page-title"><span>AI TEACHER</span><h1 id="teacher-title">영어 선생님</h1><p>내 문장을 연습하고 필요한 부분을 확인해요.</p></div>
+    <div class="hub-teacher-card"><strong>오늘의 문장 연습</strong><p>아래 한국어 문장을 영어로 만들어 보세요.</p><div class="teacher-question" id="teacher-question">나는 운동하는 것을 좋아한다.</div><textarea id="teacher-answer" rows="3" placeholder="영어 문장을 입력해 보세요." aria-label="영어 문장 답변"></textarea><div class="teacher-actions"><button type="button" class="btn" onclick="nextTeacherPrompt()">다음 문제</button><button type="button" class="btn primary" onclick="checkTeacherAnswer()">정답 확인</button></div><div class="teacher-feedback" id="teacher-feedback" role="status" aria-live="polite"></div></div>
+    <p class="hub-ai-disclaimer">현재는 기초 문장 패턴 연습 기능입니다. 생성형 AI 대화·자유 문장 채점은 아직 연결되지 않았어요. 이 화면의 정답 확인은 학습 기록에 반영되지 않습니다.</p>
+  </section>
   <!-- ③ FLASH -->
   <div class="screen" id="s-flash">
     <div class="back-row"><button class="btn" style="padding:6px 12px;font-size:.72rem;" onclick="go('learn')">← 모드 선택</button><span class="back-label">🃏 플래시카드</span></div>
@@ -330,14 +363,17 @@
   </div>
 </div>
 
-<nav class="bottom-nav">
-  <button class="bnav-btn active" onclick="go('learn')"><span class="bnav-icon">☀️</span><span class="bnav-label">오늘</span></button>
-  <button class="bnav-btn" onclick="go('input')"><span class="bnav-icon">📚</span><span class="bnav-label">보관함</span></button>
-  <button class="bnav-btn" onclick="go('profile')"><span class="bnav-icon">👤</span><span class="bnav-label">마이</span></button>
+<nav class="bottom-nav" aria-label="주요 메뉴">
+  <button class="bnav-btn active" data-nav="learn" onclick="go('learn')"><span class="bnav-icon">🏠</span><span class="bnav-label">홈</span></button>
+  <button class="bnav-btn" data-nav="courses" onclick="go('courses')"><span class="bnav-icon">📖</span><span class="bnav-label">학습</span></button>
+  <button class="bnav-btn" data-nav="teacher" onclick="go('teacher')"><span class="bnav-icon">💬</span><span class="bnav-label">AI 선생님</span></button>
+  <button class="bnav-btn" data-nav="review" onclick="go('review')"><span class="bnav-icon">🔁</span><span class="bnav-label">복습</span></button>
+  <button class="bnav-btn" data-nav="profile" onclick="go('profile')"><span class="bnav-icon">👤</span><span class="bnav-label">마이</span></button>
 </nav>
 
 <script src="js/data.js"></script>
 <script src="js/core.js"></script>
 <script src="js/app.js"></script>
+<script src="js/mobile-hub-fixes.js"></script>
 </body>
 </html>

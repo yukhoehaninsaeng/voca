@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#0f0f13"/>
+<meta name="theme-color" content="#fbf7f0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<title>VocabMaster</title>
+<title>VocaMate · 오늘의 영어 학습</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/mobile-hub.css">
 </head>
 <body>
 
@@ -40,8 +41,8 @@
 <div class="page-wrap">
   <header>
     <div>
-      <div class="logo">VocabMaster</div>
-      <span class="logo-sub">🦖티라노 단어 학습</span>
+      <div class="logo">VocaMate</div>
+      <span class="logo-sub">🦖 오늘도 영어 한 걸음</span>
     </div>
     <div class="header-right">
       <button class="btn-theme" onclick="toggleTheme()" aria-label="테마 전환">
@@ -114,6 +115,16 @@
       <button class="btn primary btn-wide today-primary" id="auto-start" onclick="startToday()">오늘 학습 시작</button>
       <button class="btn btn-wide" onclick="startToday(5)">오늘은 5분만</button>
       <details><summary>추천 이유</summary><div id="today-reasons"></div></details>
+    </section>
+    <section aria-labelledby="hub-title">
+      <div class="hub-heading"><h2 id="hub-title">목적별 학습</h2><span>원하는 연습으로 바로 이동</span></div>
+      <div class="hub-grid">
+        <button type="button" class="hub-tile" onclick="go('flash')"><span class="hub-icon" aria-hidden="true">📚</span><strong>단어 익히기</strong><small>플래시카드 · 발음 · 뜻</small></button>
+        <button type="button" class="hub-tile" onclick="go('sent')"><span class="hub-icon" aria-hidden="true">✏️</span><strong>문장 연습</strong><small>빈칸 · 문장 구조 익히기</small></button>
+        <button type="button" class="hub-tile" onclick="go('voice')"><span class="hub-icon" aria-hidden="true">🎙️</span><strong>스피킹</strong><small>토익 · 음성 말하기</small></button>
+        <button type="button" class="hub-tile" onclick="go('quiz')"><span class="hub-icon" aria-hidden="true">🔁</span><strong>기억 확인</strong><small>객관식 · 틀린 표현 점검</small></button>
+      </div>
+      <p class="hub-note">💡 AI 선생님과 자동 복습 고도화는 다음 단계에서 연결합니다. 현재는 기존 학습 기록과 채점 기능을 그대로 사용합니다.</p>
     </section>
     <div class="dash-summary">
       <div>

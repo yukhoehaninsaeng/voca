@@ -77,7 +77,7 @@
    if(!confirm('백업 항목 '+count+'개를 현재 기기의 데이터에 덮어쓰고 앱을 다시 열까요? 기존 데이터는 먼저 별도로 백업하는 것이 안전합니다.'))return;
    const previous=allData();
    try{for(const [key,value] of Object.entries(payload.storage))localStorage.setItem(key,value);}
-   catch(e){for(const [key,value] of Object.entries(previous))localStorage.setItem(key,value);throw e;}
+   catch(e){for(const key of Object.keys(payload.storage)){if(!(key in previous))localStorage.removeItem(key);}for(const [key,value] of Object.entries(previous))localStorage.setItem(key,value);throw e;}
    status('복원 완료. 앱을 새로고침합니다.');location.reload();
   }catch(e){status('복원 실패: 암호 또는 파일 형식을 확인해 주세요. '+e.message);}
  }

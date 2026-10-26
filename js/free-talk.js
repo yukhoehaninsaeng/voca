@@ -1,7 +1,7 @@
 /* Push-to-talk English conversation. Works without camera; AI needs /api/chat configured. */
 (function(){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-  let recognition=null, busy=false, history=[],topic='daily life',listening=false;
+  let recognition=null, busy=false, history=[],topic='daily life',listening=false, sessionId=0;
   const $=id=>document.getElementById(id);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const status=message=>{if($('talk-status'))$('talk-status').textContent=message;};
@@ -23,8 +23,9 @@
     window.speechSynthesis.cancel();
     avatarState('speaking');
     const utterance=new SpeechSynthesisUtterance(message);
+    utterance.onboundary=()=>{const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth=avatar.dataset.mouth==='open'?'closed':'open';};
     utterance.lang='en-US';utterance.rate=0.85;utterance.pitch=1;
-    utterance.onend=()=>avatarState('idle');
+    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';};
     utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
@@ -50,7 +51,7 @@
   }
   async function send(text){
     if(busy||!text.trim())return;
-    busy=true;avatarState('thinking');updateButton();bubble('user',text.trim());
+    busy=true;const requestSession=sessionId;avatarState('thinking');updateButton();bubble('user',text.trim());
     history.push({role:'user',content:text.trim().slice(0,700)});
     status('답변을 준비하고 있어요...');
     let reply;
@@ -65,6 +66,7 @@
       status('AI 연결이 없어 연습용 기본 응답으로 진행 중이에요.');
       if($('talk-mode'))$('talk-mode').textContent='기본 연습 모드 (AI 미연결)';
     }
+    if(requestSession!==sessionId)return;
     history.push({role:'assistant',content:reply});
     bubble('assistant',reply);busy=false;updateButton();speak(reply);
   }
@@ -79,6 +81,7 @@
     input.value='';send(value);
   };
   window.talkReset=function(){
+    sessionId++;
     if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;history=[];
     topic=$('talk-topic')?.value||'daily life';
@@ -89,8 +92,10 @@
     status('마이크를 눌러 영어로 답변해 보세요.');updateButton();speak(greeting);
   };
   window.talkStop=function(){
+    const snapshot=history.map(m=>({...m}));sessionId++;
     if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;updateButton();status('대화를 종료했어요.');
+    if(typeof window.talkAnalyze==='function')window.talkAnalyze(snapshot,topic);
   };
   window.addEventListener('DOMContentLoaded',()=>{if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});
 })();

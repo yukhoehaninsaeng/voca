@@ -45,7 +45,7 @@
   $('expansion-submit').disabled=true;
   const item={focus:focus().id,answer:extra,at:new Date().toISOString(),usedHint:!$('expansion-hint').hidden};
   attempts.push(item);
-  save({situation,base,...item});
+  save({situation,base,...item});window.dispatchEvent(new Event('voca-speaking-progress'));
   $('expansion-result').hidden=false;
   $('expansion-result').textContent='내가 만든 답변: '+base+' '+extra+'\n\n'+(guide?.example?'AI 확장 예시: '+guide.example+'\n'+(guide.tipKo||''):'좋아요! 이유·상세 설명·감정을 한 문장씩 더하는 연습을 했어요. AI 키를 연결하면 맞춤 예시를 볼 수 있어요.');
   $('expansion-next').hidden=focusIndex===focuses.length-1;

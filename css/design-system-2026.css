@@ -138,3 +138,75 @@ input[type="range"],input[type="checkbox"]{accent-color:var(--accent)}
 }
 @media(min-width:600px){.hub-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.hub-tile:not(:last-child){border-right:1px solid var(--border)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Editorial refinement: remove leftover template-like repeated tiles, pills and color coding. */
+#s-learn .home-welcome{padding:17px 2px 21px}
+#s-learn .home-eyebrow{font-size:.67rem;letter-spacing:.075em}
+#s-learn .home-welcome h1{font-size:clamp(1.5rem,4vw,1.85rem);line-height:1.38;margin:6px 0}
+#s-learn .today-card{margin-bottom:32px!important}
+#s-learn .today-card h1{font-size:1.35rem;line-height:1.4}
+#s-learn .today-card .today-counts{font-weight:650;margin:10px 0 15px}
+#s-learn .today-card .today-primary{min-height:50px;font-size:.93rem}
+#s-learn .hub-heading{margin:24px 0 11px}
+#s-learn .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--border)}
+#s-learn .hub-tile{min-height:96px;padding:17px 12px;gap:5px;border-bottom:1px solid var(--border)}
+#s-learn .hub-tile:nth-child(odd){border-right:1px solid var(--border)}
+#s-learn .hub-tile .hub-icon{display:none}
+#s-learn .hub-tile strong{font-size:.93rem}
+#s-learn .hub-tile small{font-size:.74rem}
+#s-learn .home-review-summary{margin-top:8px}
+#s-learn .dash-summary{background:transparent;box-shadow:none;border:0;padding:16px 0}
+#s-learn .dash-stats{gap:0;border-block:1px solid var(--border);margin:10px 0 23px}
+#s-learn .dash-stat{background:transparent;border:0;border-radius:0;padding:16px 8px;text-align:left}
+#s-learn .dash-stat:not(:last-child){border-right:1px solid var(--border)}
+#s-learn .ds-val,#s-learn .ds-val.b,#s-learn .ds-val.g,#s-learn .ds-val.a{font-size:1.35rem;font-weight:750;color:var(--text);line-height:1.35}
+#s-learn .ds-lbl{font-size:.71rem;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text2);margin-top:5px}
+#s-learn .selection-card{background:transparent;border:0;border-radius:0;padding:14px 0 24px;box-shadow:none!important}
+#s-learn .learn-section-title{font-size:.81rem;letter-spacing:-.015em;text-transform:none;color:var(--text);font-weight:750;margin:23px 0 12px}
+#s-learn .learn-section-title::after{background:var(--border)}
+#s-learn .mode-cards{gap:0;margin-bottom:22px;border-top:1px solid var(--border)}
+#s-learn .mode-card{background:transparent;border:0!important;border-bottom:1px solid var(--border)!important;border-radius:0;padding:18px 12px;gap:6px;min-height:105px;box-shadow:none!important;transform:none!important}
+#s-learn .mode-card::before{display:none!important}
+#s-learn .mode-card:hover{background:var(--bg3);box-shadow:none!important;transform:none!important}
+#s-learn .mode-card .mc-icon-wrap{display:none}
+#s-learn .mode-card .mc-title,#s-learn .mode-card.mc-flash .mc-title,#s-learn .mode-card.mc-quiz .mc-title,#s-learn .mode-card.mc-type .mc-title,#s-learn .mode-card.mc-blank .mc-title,#s-learn .mode-card.mc-full .mc-title{color:var(--text)!important;font-size:.91rem;font-weight:750}
+#s-learn .mode-card .mc-desc{color:var(--text2);font-size:.76rem;line-height:1.5}
+#s-learn .mode-card .mc-footer{margin-top:auto}
+#s-learn .mode-card .mc-cnt{color:var(--text2);background:transparent;border:0}
+#s-learn .mode-card .mc-arrow{color:var(--text3)}
+#s-learn .mode-card:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#s-learn .home-advanced>summary{font-weight:650;color:var(--text2)}
+/* Secondary pages: preserve one focus surface, avoid box-inside-box layouts. */
+.hub-page-title{padding-top:15px;padding-bottom:23px}
+.hub-page-title h1{font-size:clamp(1.45rem,4vw,1.85rem)}
+.hub-course-list button>span{background:transparent;padding:3px 6px 3px 0;font-size:1.08rem}
+.hub-course-list button{gap:12px;padding-block:17px}
+.hub-course-list strong{font-size:.95rem;font-weight:700}
+.hub-course-list small{font-size:.78rem}
+.hub-review-card,.hub-teacher-card{padding-top:12px}
+#s-retrieval .speaking-plan-head h2{font-size:1.19rem}
+#s-retrieval .retrieval-question h2{font-size:1.22rem}
+#s-retrieval .speaking-metric strong{font-size:1.25rem}
+#s-retrieval .retrieval-question{padding:21px 20px}
+#s-talk .talk-call-panel{padding:18px 16px 21px}
+#s-talk .talk-avatar{width:min(42vw,156px);height:min(42vw,156px);margin:17px auto 12px}
+#s-talk .talk-call-name{font-size:1.15rem}
+#s-talk .talk-pattern-panel{margin-top:20px}
+#s-talk .talk-auto-settings{margin:20px 0}
+#s-talk .talk-stt-review{padding:17px}
+#s-talk .talk-stt-review .talk-stt-actions{gap:9px}
+/* Status and CTA colors are intentional; decorative gradients and floating shadows are not. */
+.header-badge{padding:3px 7px;font-size:.66rem}
+.btn:not(.primary){box-shadow:none!important}
+.card,.metric-card,.hub-tile,.mode-card,.talk-call-panel{filter:none}
+@media(min-width:600px){
+ #s-learn .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #s-learn .hub-tile:nth-child(2){border-right:0}
+}
+@media(max-width:430px){
+ #s-learn .home-welcome{padding-top:12px}
+ #s-learn .today-card{padding:19px!important;margin-bottom:25px!important}
+ #s-learn .hub-tile{min-height:92px;padding:15px 10px}
+ #s-learn .mode-card{padding:15px 9px}
+ #s-learn .dash-stat{padding:14px 7px}
+}

@@ -148,9 +148,16 @@
       reply=data.reply;status('AI 대화 중 · 마이크를 누르면 답할 수 있어요.');
       if($('talk-mode'))$('talk-mode').textContent='AI 대화 연결됨';
     }catch(e){
+      if(requestSession!==sessionId)return;
+      const hasKey=Boolean(window.VocaUser?.active?.().key);
+      if(hasKey){
+        status('AI 응답 실패 · 키, 모델, 사용 한도 또는 네트워크를 확인해 주세요. 자동으로 가짜 AI 답변을 생성하지 않습니다.');
+        if($('talk-mode'))$('talk-mode').textContent='AI 연결 오류';
+        busy=false;avatarState('idle');updateButton();return;
+      }
       reply=offlineReply(text);
-      status('AI 연결이 없어 연습용 기본 응답으로 진행 중이에요.');
-      if($('talk-mode'))$('talk-mode').textContent='기본 연습 모드 (AI 미연결)';
+      status('AI 키 미설정 · 기본 연습 응답입니다. 마이에서 키를 등록해 주세요.');
+      if($('talk-mode'))$('talk-mode').textContent='기본 연습 모드 (AI 키 미설정)';
     }
     if(requestSession!==sessionId)return;
     history.push({role:'assistant',content:reply});

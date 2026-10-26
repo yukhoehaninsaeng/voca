@@ -367,6 +367,23 @@
       <div class="metric-card"><strong id="metric-streak">0</strong><span>연속 학습일</span></div>
     </div>
     <div class="card profile-summary"><h2>최근 7일</h2><div><strong id="metric-recent-attempts">0</strong>회 학습 · 정확도 <strong id="metric-recent-accuracy">-</strong></div><div class="profile-sub" id="metric-total">누적 시도 0회</div></div>
+    <section class="card voca-portable-settings" aria-labelledby="voca-settings-title">
+      <h2 id="voca-settings-title">AI 연결 · 내 학습 데이터</h2>
+      <p>API 키는 이 브라우저에 보관하며, AI 요청에만 전달해요. 공용 기기에서는 저장하지 마세요.</p>
+      <label class="field-label">AI 제공업체<select id="voca-provider"><option value="openai">OpenAI</option><option value="anthropic">Anthropic (Claude)</option></select></label>
+      <p id="voca-provider-hint"></p>
+      <label class="field-label">OpenAI API 키<input id="voca-openai-key" type="password" autocomplete="off" placeholder="sk-..." /></label>
+      <label class="field-label">OpenAI 모델<input id="voca-openai-model" type="text" autocomplete="off" placeholder="gpt-4o-mini"/></label>
+      <label class="field-label">Anthropic API 키<input id="voca-anthropic-key" type="password" autocomplete="off" placeholder="sk-ant-..." /></label>
+      <label class="field-label">Anthropic 모델<input id="voca-anthropic-model" type="text" autocomplete="off" placeholder="claude-haiku-4-5-20251001"/></label>
+      <div class="voca-data-actions"><button class="btn primary" id="voca-save-ai" type="button">AI 설정 저장</button><button class="btn" id="voca-clear-ai" type="button">API 키 삭제</button></div>
+      <h3>내 학습 데이터 백업 · 복원</h3>
+      <p>단어, 문장, SRS, 학습 기록, 프로필, AI 설정을 암호화된 파일 하나로 옮길 수 있어요. 키도 암호화되어 포함됩니다.</p>
+      <label class="field-label">백업 암호 (10자 이상)<input id="voca-backup-password" type="password" autocomplete="new-password" placeholder="복원 시에도 동일한 암호 필요"/></label>
+      <div class="voca-data-actions"><button class="btn primary" id="voca-export" type="button">voca_user_info.json 저장</button><button class="btn" id="voca-backup-folder" type="button">폴더에 저장 (지원 Chrome)</button></div>
+      <label class="field-label">다른 기기에서 백업 불러오기<input id="voca-import" type="file" accept=".json,application/json"/></label>
+      <div id="voca-data-status" role="status" aria-live="polite"></div>
+    </section>
     <form class="card profile-settings" id="profileSettingsForm">
       <h2>학습 설정</h2>
       <label class="field-label">오늘 학습 단어<select id="settingsItemLimit"><option value="5">5개</option><option value="10">10개</option><option value="15">15개</option><option value="20">20개</option></select></label>
@@ -392,5 +409,7 @@
 <script src="js/free-talk.js"></script>
 <script src="js/ai-provider-settings.js"></script>
 <script src="js/talk-coach.js"></script>
+<script src="js/voca-user-data.js"></script>
+<script src="js/browser-ai-adapter.js"></script>
 </body>
 </html>

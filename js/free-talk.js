@@ -91,7 +91,7 @@
           recognition=null;listening=false;avatarState('idle');updateButton();
           if(finalized||interim){
             const input=$('talk-input');
-            if(input)input.value=[finalized,interim].filter(Boolean).join(' ').trim();
+            if(input)input.value=[input.value.trim(),finalized,interim].filter(Boolean).join(' ').trim();
             status('잠시 인식이 멈췄어요. 이어 말하려면 마이크를 다시 누르세요. 완료했다면 입력창의 보내기를 누르세요.');
           }else status('음성 인식이 종료됐어요. 마이크를 다시 눌러 주세요.');
           return;
@@ -145,6 +145,7 @@
     sessionId++;
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
+    if($('talk-input'))$('talk-input').value='';
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;busy=false;history=[];
     topic=$('talk-topic')?.value||'daily life';
     if($('talk-log'))$('talk-log').textContent='';

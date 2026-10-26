@@ -1,0 +1,1 @@
+module.exports=function(req,res){res.setHeader('Cache-Control','no-store');const provider=(process.env.AI_PROVIDER||'openai').toLowerCase();const configured=provider==='anthropic'?Boolean(process.env.ANTHROPIC_API_KEY):provider==='openai'?Boolean(process.env.OPENAI_API_KEY):false;return res.status(200).json({provider,configured,freeTalk:Boolean(process.env.OPENAI_API_KEY)});};

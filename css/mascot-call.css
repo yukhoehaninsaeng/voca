@@ -59,3 +59,11 @@
 #s-talk .talk-silence-setting output{font-variant-numeric:tabular-nums;color:#23754d}
 #s-talk .talk-silence-setting input[type=range]{width:100%;accent-color:#267451;cursor:pointer;min-height:30px}
 #s-talk .talk-silence-scale{display:flex;justify-content:space-between;font-size:.72rem;color:#607b69}
+
+#s-talk .talk-stt-review{display:grid;gap:10px;background:#eef7f0;border:1px solid #b9d9c2;border-radius:16px;padding:16px;margin:14px 0}
+#s-talk .talk-stt-review[hidden]{display:none!important}
+#s-talk .talk-stt-review h3{margin:0;font-size:1rem;color:#225c3a}
+#s-talk .talk-stt-review p{margin:0;font-size:.8rem;line-height:1.5;color:#536b5a}
+#s-talk .talk-stt-review textarea{width:100%;box-sizing:border-box;border:1px solid #c4d8c9;border-radius:12px;background:white;padding:12px;font-size:16px;font-family:inherit;resize:vertical}
+#s-talk .talk-stt-actions{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-width:430px){#s-talk .talk-stt-actions .btn{flex:1}}

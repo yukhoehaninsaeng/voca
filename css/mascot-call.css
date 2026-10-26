@@ -1,0 +1,15 @@
+/* Animated voice-call character using the user's original front-facing mascot thumbnail. */
+#s-talk .talk-card{background:linear-gradient(180deg,#e8f5e6 0%,#fffaf0 70%);border-radius:28px;padding:25px 18px}
+#s-talk .talk-avatar{position:relative;width:min(70vw,310px);height:min(53vw,234px);margin:12px auto 22px;border-radius:38px;box-shadow:0 0 0 12px rgba(255,255,255,.65),0 20px 35px rgba(78,108,69,.12);transform-origin:center bottom;transition:transform .3s}
+#s-talk .talk-avatar img{width:100%;height:100%;object-fit:cover}
+#s-talk .talk-avatar[data-state="speaking"]{animation:mascot-talk .42s ease-in-out infinite alternate}
+#s-talk .talk-avatar[data-state="listening"]{animation:mascot-listen 1.25s ease-in-out infinite alternate;box-shadow:0 0 0 12px rgba(126,183,137,.26),0 0 0 24px rgba(126,183,137,.12)}
+#s-talk .talk-avatar[data-state="thinking"]{animation:mascot-think .9s ease-in-out infinite alternate}
+#s-talk .talk-avatar[data-state="speaking"]:after{content:"♪";position:absolute;top:0;right:5px;font-size:32px;color:#b37647;animation:mascot-note .7s ease-in-out infinite alternate}
+#s-talk .talk-avatar[data-state="listening"]:after{content:"•••";position:absolute;top:0;right:6px;color:#4e8e5a;font-size:22px}
+#s-talk .talk-mic{border-radius:999px;font-size:1rem;padding:18px!important}
+@keyframes mascot-talk{from{transform:translateY(0) rotate(-1deg) scale(1)}to{transform:translateY(-5px) rotate(1deg) scale(1.025)}}
+@keyframes mascot-listen{from{transform:rotate(-2deg)}to{transform:rotate(2deg)}}
+@keyframes mascot-think{from{transform:translateY(0)}to{transform:translateY(-4px)}}
+@keyframes mascot-note{from{transform:translateY(5px);opacity:.4}to{transform:translateY(-8px);opacity:1}}
+@media(prefers-reduced-motion:reduce){#s-talk .talk-avatar{animation:none!important}#s-talk .talk-avatar:after{animation:none!important}}

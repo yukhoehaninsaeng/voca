@@ -1,0 +1,29 @@
+/* Mobile learning hub v1: additive, existing app state and SRS unchanged */
+:root{--bg:#fbf7f0;--bg2:#fffdf9;--bg3:#f5eee2;--text:#34291f;--text2:#74675c;--text3:#95877a;--border:rgba(104,75,48,.12);--border2:rgba(104,75,48,.22);--accent:#a36b42;--sh:0 8px 26px rgba(95,63,35,.07)}
+body.light{--bg:#fbf7f0;--bg2:#fffdf9;--bg3:#f5eee2;--text:#34291f;--text2:#74675c;--text3:#95877a;--border:rgba(104,75,48,.12);--border2:rgba(104,75,48,.22);--accent:#a36b42;--sh:0 8px 26px rgba(95,63,35,.07)}
+body{background:var(--bg);color:var(--text);font-family:'Nunito','Noto Sans KR',sans-serif}
+.page-wrap{max-width:760px}
+.logo{background:none;-webkit-text-fill-color:var(--text);color:var(--text);letter-spacing:-.04em}
+header{border-bottom:0;margin-bottom:.55rem}
+.today-card{background:linear-gradient(135deg,#ad744b,#865331)!important;color:#fff!important;border:0!important;border-radius:22px!important;box-shadow:0 10px 26px rgba(133,83,49,.15)!important}
+.today-card h1,.today-card p,.today-card .today-kicker,.today-card .today-counts{color:#fff!important}
+.today-card .today-primary{background:#fff9ee!important;color:#7a4b2b!important;border:0!important;box-shadow:none!important}
+.today-card .btn:not(.today-primary){border-color:rgba(255,255,255,.45);color:#fff}
+.today-card select{color:#34291f}
+.hub-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px}
+.hub-heading h2{font-size:1.13rem;letter-spacing:-.03em}
+.hub-heading span{font-size:.72rem;color:var(--text2)}
+.hub-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-bottom:16px}
+.hub-tile{min-width:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:7px;padding:17px 14px;background:#fffdf9;border:1px solid var(--border);border-radius:19px;color:var(--text);font-family:inherit;cursor:pointer;min-height:140px;box-shadow:var(--sh)}
+.hub-tile:focus-visible{outline:3px solid #a36b42;outline-offset:2px}
+.hub-tile .hub-icon{display:grid;place-items:center;width:37px;height:37px;border-radius:12px;background:#f6e8d6;font-size:1.2rem}
+.hub-tile strong{font-size:.94rem}.hub-tile small{font-size:.72rem;line-height:1.5;color:var(--text2)}
+.hub-note{background:#fff5df;border:1px solid #ead8b5;border-radius:15px;padding:13px 15px;font-size:.78rem;line-height:1.65;color:#775632;margin-bottom:18px}
+.selection-card{margin-top:20px}
+.bottom-nav{background:rgba(255,252,246,.97);border-top-color:var(--border)}
+.bnav-btn{color:#8e7c6b}.bnav-btn.active{color:#995e36}
+.btn.primary{background:var(--accent);border-color:var(--accent);box-shadow:none}
+.card,.selection-card,.metric-card{box-shadow:var(--sh)}
+@media(max-width:390px){.hub-grid{gap:8px}.hub-tile{padding:13px 11px;min-height:135px}.hub-tile strong{font-size:.86rem}}
+@media(min-width:600px){.top-nav{display:flex}.bottom-nav{display:none}}
+@media(prefers-reduced-motion:reduce){.screen{animation:none}}

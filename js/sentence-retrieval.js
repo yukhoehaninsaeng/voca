@@ -18,10 +18,11 @@
  const now=()=>Date.now(),day=86400000;
  const load=()=>{try{const v=JSON.parse(localStorage.getItem(KEY));return v&&typeof v==='object'&&Array.isArray(v.attempts)&&v.cards?v:{attempts:[],cards:{}};}catch(e){return {attempts:[],cards:{}};}};
  const save=d=>{try{localStorage.setItem(KEY,JSON.stringify(d));}catch(e){setStatus('저장 공간이 부족해 결과를 저장하지 못했어요.');}};
- let current=null,started=0,hint=0,checked=false,rec=null,spoken='',recognitionStarted=false;
+ let current=null,started=0,hint=0,checked=false,rec=null,spoken='',recognitionStarted=false,queue=[];
  const setStatus=t=>{if($('retrieval-status'))$('retrieval-status').textContent=t;};
  const normalize=s=>String(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
  function choose(){
+  while(queue.length){const id=queue.shift(),selected=tasks.find(t=>t.id===id);if(selected)return selected;}
   const data=load(),due=tasks.filter(t=>!data.cards[t.id]||data.cards[t.id].due<=now());
   const pool=due.length?due:tasks;
   const min=Math.min(...pool.map(t=>data.cards[t.id]?.attempts||0));
@@ -79,7 +80,7 @@
   data.cards[current.id]={level,attempts:prev.attempts+1,due:now()+interval*day,last:now()};
   data.attempts.push({id:current.id,at:new Date().toISOString(),...current._attempt,selfRatedCorrect:ok,independent});
   data.attempts=data.attempts.slice(-500);
-  save(data);next();
+  save(data);window.dispatchEvent(new Event('voca-speaking-progress'));next();
  }
  function mic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -101,6 +102,7 @@
   $('retrieval-correct').addEventListener('click',()=>grade(true));
   $('retrieval-retry').addEventListener('click',()=>grade(false));
   $('retrieval-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();check();}});
+  window.addEventListener('voca-retrieval-select',e=>{const id=e.detail?.id;if(tasks.some(t=>t.id===id)){queue=[id];next();}});
   next();
  });
 })();

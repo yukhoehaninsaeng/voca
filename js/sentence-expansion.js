@@ -10,6 +10,7 @@
  function focus(){return focuses[focusIndex];}
  async function prepare(){
   if(!base)return;
+  $('expansion-submit').disabled=false;
   const id=++requestId;guide=null;$('expansion-input').value='';$('expansion-result').hidden=true;$('expansion-next').hidden=true;$('expansion-hint').hidden=true;
   $('expansion-focus').textContent=focus().label;
   $('expansion-question').textContent=focus().question;
@@ -41,6 +42,7 @@
  function submit(){
   const extra=$('expansion-input').value.trim();
   if(!extra){status('기본 문장에 덧붙일 내용을 영어로 입력해 주세요.');return;}
+  $('expansion-submit').disabled=true;
   const item={focus:focus().id,answer:extra,at:new Date().toISOString(),usedHint:!$('expansion-hint').hidden};
   attempts.push(item);
   save({situation,base,...item});

@@ -21,6 +21,8 @@
   }
   const VOICE_KEY='vm-talk-voice-v1';
   let callStartedAt=0,callClock=null;
+  const VOICE_MIGRATION='vm-talk-voice-default-v2';
+  if(!localStorage.getItem(VOICE_MIGRATION)){localStorage.setItem(VOICE_KEY,'default');localStorage.setItem(VOICE_MIGRATION,'1');}
   function englishVoices(){
     if(!window.speechSynthesis)return [];
     return window.speechSynthesis.getVoices().filter(v=>/^en([_-]|$)/i.test(v.lang));

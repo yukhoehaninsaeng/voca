@@ -10,7 +10,7 @@
   const saved=readSettings();
   return {provider:saved.provider==='anthropic'?'anthropic':'openai',openai:saved.openai||'',anthropic:saved.anthropic||'',openaiModel:saved.openaiModel||'gpt-4o-mini',anthropicModel:saved.anthropicModel||'claude-haiku-4-5-20251001'};
  }
- function saveSettings(value){localStorage.setItem(KEY,JSON.stringify(value));}
+ function saveSettings(value){localStorage.setItem(KEY,JSON.stringify(value));window.dispatchEvent(new Event('voca-ai-settings-changed'));}
  function active(){const s=settings();return {provider:s.provider,key:s[s.provider],model:s[s.provider+'Model']};}
  async function ai(task,payload={}){
   const s=active();if(!s.key)throw Error('브라우저 AI 설정에서 '+s.provider+' API 키를 등록해 주세요.');
@@ -28,9 +28,9 @@
   provider.dispatchEvent(new Event('change'));
   $('voca-save-ai').addEventListener('click',()=>{
    saveSettings({provider:provider.value,openai:$('voca-openai-key').value.trim(),anthropic:$('voca-anthropic-key').value.trim(),openaiModel:$('voca-openai-model').value.trim()||'gpt-4o-mini',anthropicModel:$('voca-anthropic-model').value.trim()||'claude-haiku-4-5-20251001'});
-   status('브라우저에 AI 설정을 저장했어요. 키는 이 기기에 보관되며, AI 요청 때마다 서버를 경유합니다.');
+   status('AI 설정 저장 완료. 실제 연결은 AI 연결 테스트를 눌러 확인해 주세요.');
   });
-  $('voca-clear-ai').addEventListener('click',()=>{if(!confirm('이 브라우저의 API 키를 삭제할까요?'))return;localStorage.removeItem(KEY);localStorage.removeItem(LEGACY);$('voca-openai-key').value='';$('voca-anthropic-key').value='';status('저장된 API 키를 삭제했어요.');});
+  $('voca-clear-ai').addEventListener('click',()=>{if(!confirm('이 브라우저의 API 키를 삭제할까요?'))return;localStorage.removeItem(KEY);localStorage.removeItem(LEGACY);$('voca-openai-key').value='';$('voca-anthropic-key').value='';window.dispatchEvent(new Event('voca-ai-settings-changed'));status('저장된 API 키를 삭제했어요.');});
   $('voca-export').addEventListener('click',exportBackup);
   $('voca-import').addEventListener('change',importBackup);
   $('voca-backup-folder').addEventListener('click',connectFolder);
@@ -78,7 +78,7 @@
    const previous=allData();
    try{for(const [key,value] of Object.entries(payload.storage))localStorage.setItem(key,value);}
    catch(e){for(const key of Object.keys(payload.storage)){if(!(key in previous))localStorage.removeItem(key);}for(const [key,value] of Object.entries(previous))localStorage.setItem(key,value);throw e;}
-   status('복원 완료. 앱을 새로고침합니다.');location.reload();
+   window.dispatchEvent(new Event('voca-ai-settings-changed'));status('복원 완료. 앱을 새로고침합니다.');location.reload();
   }catch(e){status('복원 실패: 암호 또는 파일 형식을 확인해 주세요. '+e.message);}
  }
  async function connectFolder(){

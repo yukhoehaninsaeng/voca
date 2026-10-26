@@ -19,13 +19,36 @@
     const div=document.createElement('div');div.className='talk-bubble '+role;
     div.textContent=message;log.appendChild(div);log.scrollTop=log.scrollHeight;
   }
+  const VOICE_KEY='vm-talk-voice-v1';
+  function englishVoices(){
+    if(!window.speechSynthesis)return [];
+    return window.speechSynthesis.getVoices().filter(v=>/^en([_-]|$)/i.test(v.lang));
+  }
+  function preferredVoice(voices){
+    const saved=localStorage.getItem(VOICE_KEY);
+    if(saved){const found=voices.find(v=>v.voiceURI===saved);if(found)return found;}
+    const priority=[/samantha/i,/ava/i,/allison/i,/serena/i,/karen/i,/moira/i,/jenny/i,/aria/i,/zira/i,/female/i];
+    return voices.find(v=>priority.some(p=>p.test(v.name)))||voices.find(v=>/^en-US/i.test(v.lang)&&v.localService)||voices[0]||null;
+  }
+  function refreshVoices(){
+    const select=$('talk-voice');if(!select)return;
+    const voices=englishVoices(),current=localStorage.getItem(VOICE_KEY);
+    select.replaceChildren();
+    if(!voices.length){const o=document.createElement('option');o.value='';o.textContent='기기 음성 로딩 중';select.append(o);return;}
+    voices.forEach(v=>{const o=document.createElement('option');o.value=v.voiceURI;o.textContent=v.name+' ('+v.lang+')';select.append(o);});
+    select.value=voices.some(v=>v.voiceURI===current)?current:preferredVoice(voices)?.voiceURI||voices[0].voiceURI;
+  }
+  window.talkPreviewVoice=function(){speak('Hi! It is so nice to meet you. What would you like to talk about today?');};
   function speak(message){
     if(!('speechSynthesis' in window)){status('음성 재생 미지원 · 텍스트를 확인해 주세요.');return;}
     window.speechSynthesis.cancel();
     avatarState('speaking');
     const utterance=new SpeechSynthesisUtterance(message);
     // No synthetic mouth overlay: preserve the supplied character image.
-    utterance.lang='en-US';utterance.rate=0.85;utterance.pitch=1;
+    const voices=englishVoices();const selected=$('talk-voice')?.value;
+    const voice=voices.find(v=>v.voiceURI===selected)||preferredVoice(voices);
+    if(voice)utterance.voice=voice;
+    utterance.lang=voice?.lang||'en-US';utterance.rate=0.94;utterance.pitch=1.12;
     utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';};
     utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
@@ -160,5 +183,5 @@
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;updateButton();status('대화를 종료했어요.');
     if(typeof window.talkAnalyze==='function')window.talkAnalyze(snapshot,topic);
   };
-  window.addEventListener('DOMContentLoaded',()=>{if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});
+  window.addEventListener('DOMContentLoaded',()=>{refreshVoices();if(window.speechSynthesis){window.speechSynthesis.addEventListener?.('voiceschanged',refreshVoices);}const select=$('talk-voice');select?.addEventListener('change',()=>{localStorage.setItem(VOICE_KEY,select.value);});if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});
 })();

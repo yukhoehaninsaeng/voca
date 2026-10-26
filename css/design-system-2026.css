@@ -1,0 +1,140 @@
+/* VocaMate visual system — presentation only; no interaction changes. */
+:root,body.light{
+ --bg:#f7f8f9;--bg2:#fff;--bg3:#f0f2f4;
+ --text:#20262b;--text2:#667078;--text3:#899198;
+ --border:#e3e7e9;--border2:#d4dade;
+ --accent:#24735b;--green:#24735b;--green-bg:#eaf3ef;
+ --amber:#9a6a29;--amber-bg:#f9f3e8;
+ --red:#b74b4b;--red-bg:#f9eeee;
+ --blue:#356d96;--blue-bg:#edf3f7;
+ --purple:#695d91;--purple-bg:#f2f0f8;
+ --r:12px;--r-sm:9px;--sh:none;
+}
+html{font-size:16px}
+body{font-family:'Noto Sans KR','Nunito',sans-serif;line-height:1.62;letter-spacing:-.012em;background:var(--bg);color:var(--text)}
+.page-wrap{max-width:880px;padding-left:calc(clamp(18px,4vw,36px) + var(--sal));padding-right:calc(clamp(18px,4vw,36px) + var(--sar))}
+header{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.logo{font-size:1.45rem;font-weight:800;letter-spacing:-.055em;color:var(--text);background:none;-webkit-text-fill-color:var(--text)}
+.logo-sub{font-weight:400;color:var(--text2);font-size:.7rem}
+.header-badge{background:var(--bg3);color:var(--text2);font-weight:600;border-radius:5px;letter-spacing:0}
+.header-badge:is([data-state="connected"],.connected){background:var(--green-bg);color:var(--green)}
+.btn,.btn-api{font-weight:650;border-radius:9px;box-shadow:none!important;transition:background-color .15s,border-color .15s,color .15s}
+.btn.primary,.today-card .today-primary{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;box-shadow:none!important}
+.btn.primary:hover{background:#1b5f4a!important}
+.btn:focus-visible,.hub-tile:focus-visible,.bnav-btn:focus-visible,.tnav-btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card,.selection-card,.metric-card{box-shadow:none!important;border:1px solid var(--border);border-radius:12px;background:var(--bg2)}
+.modal{box-shadow:0 12px 40px rgba(20,30,35,.12)!important;border-radius:14px}
+.hub-screen{padding-top:8px}
+.hub-page-title{padding:22px 2px 28px}
+.hub-page-title>span,.home-eyebrow{font-size:.68rem;letter-spacing:.09em;font-weight:700;color:var(--text2)}
+.hub-page-title h1,.home-welcome h1{font-size:clamp(1.65rem,4.5vw,2.1rem);line-height:1.35;font-weight:800;letter-spacing:-.055em;margin:9px 0}
+.hub-page-title p,.home-welcome p{font-size:.89rem;color:var(--text2);line-height:1.65}
+.home-welcome{padding:26px 2px 25px}
+.hub-heading{margin:34px 0 16px;align-items:baseline}
+.hub-heading h2{font-size:1.16rem;font-weight:750;letter-spacing:-.035em}
+.hub-heading span{color:var(--text3)}
+/* Primary learning task: one restrained focal surface, not a colorful card. */
+.today-card{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border)!important;border-radius:13px!important;box-shadow:none!important;padding:clamp(20px,4vw,30px)!important}
+.today-card h1{font-size:1.5rem;letter-spacing:-.04em;color:var(--text)!important}
+.today-card p,.today-card .today-counts{color:var(--text2)!important}
+.today-card .today-kicker{color:var(--text3)!important;font-weight:700;letter-spacing:.09em}
+.today-card .home-progress-track{background:var(--bg3);height:6px;box-shadow:none}
+.today-card .home-progress-track span{background:var(--accent)}
+.today-card .home-progress-label{color:var(--text2);font-weight:600}
+.today-card .btn:not(.today-primary){color:var(--text2);border-color:var(--border2);background:transparent}
+.today-card select{color:var(--text);background:var(--bg2)}
+/* Course options are navigational rows with subtle separators, not individual cards. */
+.hub-grid{gap:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:28px}
+.hub-tile{background:transparent;border:0;border-radius:0;box-shadow:none;min-height:112px;padding:19px 13px;gap:6px;transition:background .15s}
+.hub-tile:hover{background:var(--bg3)}
+.hub-tile .hub-icon{width:auto;height:auto;background:none;border-radius:0;padding:0;font-size:1.12rem;opacity:.75}
+.hub-tile strong{font-size:.94rem;font-weight:750}
+.hub-tile small{font-size:.75rem;color:var(--text2)}
+.home-review-summary{background:transparent;border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;padding:18px 0;margin:18px 0 28px}
+.home-review-summary p{color:var(--text2)}
+.home-review-summary .btn{background:var(--bg2);color:var(--text)}
+.home-advanced>summary{background:transparent;border-top:1px solid var(--border);border-radius:0;padding:16px 0}
+.hub-course-list{gap:0;border-top:1px solid var(--border)}
+.hub-course-list button{background:transparent;border:0;border-bottom:1px solid var(--border);border-radius:0;padding:19px 4px}
+.hub-course-list button>span{background:var(--bg3);border-radius:9px}
+.hub-course-list button:hover{background:var(--bg3)}
+.hub-review-card,.hub-teacher-card{background:transparent;border:0;border-radius:0;padding:14px 0 25px;border-bottom:1px solid var(--border)}
+.hub-review-card>strong{color:var(--text)}
+.teacher-question{background:var(--bg3);border-radius:10px;font-weight:700}
+.bottom-nav,body.light .bottom-nav{background:rgba(255,255,255,.97);border-top:1px solid var(--border);box-shadow:none}
+.bnav-btn{color:var(--text2)}
+.bnav-btn.active{color:var(--accent)}
+.top-nav{border-bottom:1px solid var(--border)}
+.tnav-btn.active{color:var(--accent)}
+/* Speaking plan: use typography and horizontal rules for hierarchy. */
+#s-retrieval .speaking-plan{max-width:720px;background:transparent;border:0;border-radius:0;padding:12px 0 28px;gap:18px;margin-bottom:24px;border-bottom:1px solid var(--border)}
+#s-retrieval .speaking-plan-head small{color:var(--text3);font-weight:700}
+#s-retrieval .speaking-plan-head h2{font-size:1.3rem;letter-spacing:-.04em}
+#s-retrieval .speaking-plan-head p,#s-retrieval .speaking-plan-desc,#s-retrieval .speaking-weakness{color:var(--text2)}
+#s-retrieval .speaking-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-block:1px solid var(--border)}
+#s-retrieval .speaking-metric{background:transparent;border-radius:0;padding:15px 10px}
+#s-retrieval .speaking-metric strong{font-size:1.35rem;color:var(--text)}
+#s-retrieval .speaking-metric small{color:var(--text2)}
+#s-retrieval .speaking-daily-list{gap:0}
+#s-retrieval .speaking-daily-list li{background:transparent;border-radius:0;padding:12px 2px;border-bottom:1px solid var(--border)}
+#s-retrieval .speaking-daily-list small{color:var(--text2)}
+#s-retrieval .retrieval-card{max-width:720px;background:transparent;border:0;border-radius:0;padding:10px 0 30px;gap:20px}
+#s-retrieval .retrieval-heading span{color:var(--text3);font-weight:600;letter-spacing:.05em}
+#s-retrieval .retrieval-question{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:24px}
+#s-retrieval .retrieval-question small{color:var(--text2)}
+#s-retrieval .retrieval-question h2{color:var(--text);font-size:1.35rem;font-weight:750}
+#s-retrieval .retrieval-entry input,#s-retrieval .expansion-panel textarea{background:var(--bg2);border-color:var(--border2);border-radius:9px;color:var(--text)}
+#s-retrieval .retrieval-hint{background:var(--bg3);border-radius:9px;color:var(--text2)}
+#s-retrieval .retrieval-answer{background:var(--bg2);border-color:var(--border);border-radius:9px;color:var(--text)}
+#s-retrieval .expansion-panel{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:24px 0}
+#s-retrieval .expansion-title span{background:var(--bg3);color:var(--text2);border-radius:6px}
+#s-retrieval .expansion-guide{color:var(--text2)}
+/* Conversation: quiet layout with call state as the sole high-contrast focal point. */
+#s-talk .talk-card{max-width:720px;background:transparent;border:0;border-radius:0;padding:0 0 32px;text-align:left}
+#s-talk .talk-call-panel{background:#29343a;border-radius:13px;padding:20px 16px 25px;box-shadow:none;color:#fff;text-align:center}
+#s-talk .talk-call-top{color:#c8d1d4;font-weight:600}
+#s-talk .talk-call-dot{box-shadow:none!important}
+#s-talk .talk-call-panel:not([data-call-state="idle"]) .talk-call-dot{background:#77c9a5}
+#s-talk .talk-avatar{width:min(46vw,180px);height:min(46vw,180px);margin:20px auto 14px;background:#e7eae7;box-shadow:none;border-radius:50%}
+#s-talk .talk-avatar[data-state="listening"]{box-shadow:0 0 0 5px rgba(119,201,165,.25)}
+#s-talk .talk-avatar[data-state="speaking"]:after,#s-talk .talk-avatar[data-state="listening"]:after{display:none}
+#s-talk .talk-call-name{font-size:1.23rem;font-weight:750}
+#s-talk .talk-call-state{color:#d4dde0}
+#s-talk .talk-call-wave i{background:#9cb6aa}
+#s-talk .talk-mode{margin:16px 0 22px;color:var(--text2)}
+#s-talk .talk-card label{color:var(--text2);font-weight:650}
+#s-talk .talk-card select{border-color:var(--border2);border-radius:9px;background:var(--bg2);color:var(--text)}
+#s-talk .talk-auto-settings{background:transparent;border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;margin:24px 0;padding:0 0 14px}
+#s-talk .talk-auto-settings .talk-auto-turn{padding:18px 0}
+#s-talk .talk-auto-turn strong{color:var(--text)}
+#s-talk .talk-auto-turn small,#s-talk .talk-silence-scale{color:var(--text2)}
+#s-talk .talk-silence-setting{border-color:var(--border)}
+#s-talk .talk-silence-setting label{color:var(--text)}
+#s-talk .talk-silence-setting output{color:var(--accent)}
+#s-talk .talk-call-actions{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+#s-talk .talk-call-actions .btn:first-child{background:var(--accent);color:#fff}
+#s-talk .talk-log{background:transparent;border-block:1px solid var(--border);border-radius:0;padding:18px 0}
+#s-talk .talk-bubble.assistant{background:var(--bg2);border-color:var(--border);color:var(--text)}
+#s-talk .talk-bubble.user{background:var(--green-bg);color:var(--text)}
+#s-talk .talk-mic{border-radius:10px;font-size:.96rem}
+#s-talk .talk-compose input{background:var(--bg2);border-color:var(--border2);color:var(--text)}
+#s-talk .talk-stt-review{background:var(--bg2);border:1px solid var(--border);border-radius:12px}
+#s-talk .talk-stt-review h3{color:var(--text)}
+#s-talk .talk-stt-review p{color:var(--text2)}
+#s-talk .talk-pattern-panel{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:22px 0}
+#s-talk .talk-pattern-panel h3{font-size:1.03rem}
+#s-talk .talk-recording-help,#s-talk .talk-status,.hub-ai-disclaimer{color:var(--text2)}
+/* Accessible input surfaces and reduced decoration throughout. */
+input,textarea,select{font-family:inherit}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select{box-shadow:none}
+input[type="range"],input[type="checkbox"]{accent-color:var(--accent)}
+@media(max-width:540px){
+ .hub-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .hub-tile{min-height:112px;padding:18px 10px}
+ .hub-tile:nth-child(odd){border-right:1px solid var(--border)}
+ .hub-tile:nth-child(-n+2){border-bottom:1px solid var(--border)}
+ #s-talk .talk-call-actions .btn{flex:1}
+ .home-welcome{padding-top:18px}
+}
+@media(min-width:600px){.hub-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.hub-tile:not(:last-child){border-right:1px solid var(--border)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}

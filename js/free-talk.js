@@ -2,7 +2,7 @@
 (function(){
   const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
   let recognition=null, busy=false, history=[],topic='daily life',listening=false, sessionId=0;
-  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0;
+  let finalized='',interim='',submitWhenStopped=false,manualStop=false,recognitionToken=0,callActive=false,captions=false;
   const $=id=>document.getElementById(id);
   const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const status=message=>{if($('talk-status'))$('talk-status').textContent=message;};
@@ -55,7 +55,7 @@
   }
   function updateTranscript(){
     const node=$('talk-live-transcript');
-    if(node)node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();
+    if(node){node.textContent=[finalized,interim].filter(Boolean).join(' ').trim();node.hidden=!captions;}
   }
   function updateButton(){
     const b=$('talk-mic');if(!b)return;
@@ -70,7 +70,9 @@
     try{recognition.stop();}catch(e){completeSpeech();}
   }
   function completeSpeech(){
-    const text=[finalized,interim].filter(Boolean).join(' ').trim();
+    const draft=$('talk-input')?.value.trim()||'';
+    const text=[draft,finalized,interim].filter(Boolean).join(' ').trim();
+    if($('talk-input'))$('talk-input').value='';
     listening=false;recognition=null;avatarState('idle');updateButton();
     if(submitWhenStopped&&text)send(text);
     else if(submitWhenStopped)status('인식된 문장이 없어요. 다시 말해 주세요.');
@@ -154,9 +156,23 @@
     history.push({role:'assistant',content:reply});
     bubble('assistant',reply);busy=false;updateButton();speak(reply);
   }
+  window.talkBeginCall=function(){
+    if(callActive)return;
+    callActive=true;const log=$('talk-log');if(log)log.hidden=!captions;
+    const greeting=opening[topic]||opening['daily life'];
+    status('AI 친구가 먼저 말을 걸어요. 듣고 마이크를 눌러 답하세요.');
+    speak(greeting);
+  };
+  window.talkToggleTranscript=function(){
+    captions=!captions;
+    const log=$('talk-log');if(log)log.hidden=!captions;
+    updateTranscript();
+    status(captions?'자막이 표시돼요.':'자막을 숨겼어요. 목소리에 집중해 보세요.');
+  };
   window.talkStart=function(){
     window.speechSynthesis?.cancel();
     if(recognition){finishSpeech();return;}
+    if(!callActive){callActive=true;}
     begin();
   };
   window.talkSendText=function(){
@@ -165,7 +181,7 @@
     input.value='';send(value);
   };
   window.talkReset=function(){
-    sessionId++;
+    sessionId++;callActive=false;
     recognitionToken++;if(recognition){recognition.abort();recognition=null;}
     finalized='';interim='';submitWhenStopped=false;manualStop=false;updateTranscript();
     if($('talk-input'))$('talk-input').value='';
@@ -175,12 +191,14 @@
     if($('talk-mode'))$('talk-mode').textContent='연결 상태 확인 중';
     const greeting=opening[topic]||opening['daily life'];
     bubble('assistant',greeting);history.push({role:'assistant',content:greeting});
-    status('마이크를 눌러 영어로 답변해 보세요.');updateButton();speak(greeting);
+    if($('talk-log'))$('talk-log').hidden=!captions;
+    status('음성 대화 시작을 눌러 AI 친구의 첫 질문을 들어 보세요.');updateButton();
   };
   window.talkStop=function(){
-    const snapshot=history.map(m=>({...m}));sessionId++;
+    const snapshot=history.map(m=>({...m}));sessionId++;callActive=false;
     if(recognition){recognition.abort();recognition=null;}
     window.speechSynthesis?.cancel();avatarState('idle');listening=false;updateButton();status('대화를 종료했어요.');
+    if($('talk-log'))$('talk-log').hidden=false;
     if(typeof window.talkAnalyze==='function')window.talkAnalyze(snapshot,topic);
   };
   window.addEventListener('DOMContentLoaded',()=>{refreshVoices();if(window.speechSynthesis){window.speechSynthesis.addEventListener?.('voiceschanged',refreshVoices);}const select=$('talk-voice');select?.addEventListener('change',()=>{localStorage.setItem(VOICE_KEY,select.value);});if($('talk-log')){talkReset();$('talk-input')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();talkSendText();}});}});

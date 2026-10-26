@@ -49,7 +49,7 @@
     const voice=voices.find(v=>v.voiceURI===selected)||preferredVoice(voices);
     if(voice)utterance.voice=voice;
     utterance.lang=voice?.lang||'en-US';utterance.rate=0.94;utterance.pitch=1.12;
-    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';};
+    utterance.onend=()=>{avatarState('idle');const avatar=document.querySelector('.talk-avatar');if(avatar)avatar.dataset.mouth='closed';if(callActive&&!busy&&!listening)begin();};
     utterance.onerror=()=>{avatarState('idle');status('음성 재생이 제한되었어요. 텍스트로 계속 연습할 수 있어요.');};
     window.speechSynthesis.speak(utterance);
   }
@@ -160,7 +160,7 @@
     if(callActive)return;
     callActive=true;const log=$('talk-log');if(log)log.hidden=!captions;
     const greeting=opening[topic]||opening['daily life'];
-    status('AI 친구가 먼저 말을 걸어요. 듣고 마이크를 눌러 답하세요.');
+    status('AI 친구가 먼저 말을 걸어요. 질문이 끝나면 마이크가 자동으로 켜집니다.');
     speak(greeting);
   };
   window.talkToggleTranscript=function(){

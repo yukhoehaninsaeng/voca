@@ -24,24 +24,67 @@
    const btn=el('button','기억했어요','btn');btn.type='button';btn.addEventListener('click',()=>{const q=read(KEY,[]);const found=q.find(y=>y.id===x.id);if(found){found.level=Math.min(found.level+1,intervals.length-1);found.due=dueDate(intervals[found.level]);write(KEY,q);renderDue();}});row.append(btn);node.append(row);
   });
  }
+ function renderConversation(section,history){
+  section.append(el('h4','전체 대화 기록'));
+  const transcript=el('div',undefined,'talk-transcript-history');
+  history.forEach((m,index)=>{
+   if(!['user','assistant'].includes(m.role)||!m.content)return;
+   const line=el('div',undefined,'talk-history-line '+m.role);
+   line.append(el('strong',m.role==='user'?'나':'AI 친구'),el('p',m.content));
+   transcript.append(line);
+  });
+  section.append(transcript);
+ }
+ function renderReport(section,data){
+  if(!data)return;
+  section.append(el('h4','AI 피드백'));
+  section.append(el('p',data.summary||'대화를 완료했어요.'));
+  if(data.strengths?.length){section.append(el('h4','잘한 점'));data.strengths.forEach(x=>section.append(el('p','✓ '+x)));}
+  if(data.corrections?.length){section.append(el('h4','자연스러운 표현으로 고치기'));data.corrections.forEach(x=>{const row=el('div',undefined,'talk-correction');row.append(el('p','내 표현: '+x.original),el('p','추천 표현: '+x.corrected),el('small',x.reason));section.append(row);});}
+  else section.append(el('p','AI가 발견한 뚜렷한 문법 오류가 없어요.'));
+  if(data.nextPractice?.length){section.append(el('h4','다음에 연습할 문장'));data.nextPractice.forEach(x=>section.append(el('p',x.en+' — '+x.ko)));}
+ }
+ function showSession(record,section){
+  section.hidden=false;section.dataset.sessionId=record.id;section.replaceChildren();
+  section.append(el('h3','회화 기록 · 피드백'));
+  section.append(el('p',new Date(record.date).toLocaleString('ko-KR')+' · '+record.topic+' · 내가 말한 횟수 '+record.turns));
+  renderConversation(section,record.history||[]);
+  if(record.feedback)renderReport(section,record.feedback);
+  else section.append(el('p',record.error||'AI 피드백을 기다리고 있어요.'));
+  const dueBox=el('div');dueBox.id='talk-review-due';section.append(dueBox);renderDue();
+ }
+ window.talkShowPast=function(index){
+  const records=read(HISTORY,[]),record=records[index],section=$('talk-feedback');
+  if(record&&section){showSession(record,section);section.scrollIntoView({behavior:'smooth',block:'start'});}
+ };
  window.talkAnalyze=async function(history,topic){
   const section=$('talk-feedback');if(!section)return;
-  section.hidden=false;section.replaceChildren();section.append(el('h3','대화 피드백'));
   const turns=history.filter(m=>m.role==='user'&&m.content?.trim());
-  if(!turns.length){section.append(el('p','먼저 영어로 대화한 다음 종료해 주세요.'));renderDue();return;}
-  section.append(el('p','AI가 문장과 문법을 분석하고 있어요. 발음 평가는 포함되지 않습니다.'));
+  if(!turns.length){section.hidden=false;section.replaceChildren();section.append(el('p','먼저 영어로 대화해 주세요.'));return;}
+  const record={id:Date.now()+'-'+Math.random().toString(36).slice(2,7),date:new Date().toISOString(),topic,turns:turns.length,history:history.filter(m=>['user','assistant'].includes(m.role)).map(m=>({role:m.role,content:String(m.content||'').slice(0,700)})),feedback:null,error:'AI가 대화 내용을 분석하고 있어요.'};
+  let past=read(HISTORY,[]);past.push(record);write(HISTORY,past.slice(-30));
+  showSession(record,section);
   try{
    const response=await fetch('/api/talk-feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic,history})});
    const data=await response.json();if(!response.ok)throw Error(data.error||'분석 실패');
-   section.replaceChildren();section.append(el('h3','오늘의 회화 피드백'));section.append(el('p',data.summary||'대화를 완료했어요.'));
-   if(data.strengths?.length){section.append(el('h4','잘한 점'));data.strengths.forEach(x=>section.append(el('p','✓ '+x)));}
-   if(data.corrections?.length){section.append(el('h4','다듬으면 좋은 표현'));data.corrections.forEach(x=>{const row=el('div',undefined,'talk-correction');row.append(el('p','내 표현: '+x.original),el('p','추천 표현: '+x.corrected),el('small',x.reason));section.append(row);});}
-   else section.append(el('p','이번 대화에서는 뚜렷한 문법 오류를 찾지 못했어요.'));
-   queuePractice(data.nextPractice||[]);
-   const past=read(HISTORY,[]);past.push({date:new Date().toISOString(),topic,turns:turns.length,summary:String(data.summary||'').slice(0,450)});write(HISTORY,past.slice(-30));
-   section.append(el('p','추천 표현을 별도의 회화 복습함에 저장했어요.'));
-   const dueBox=el('div');dueBox.id='talk-review-due';section.append(dueBox);renderDue();
-  }catch(e){section.replaceChildren();section.append(el('h3','대화를 마쳤어요'));section.append(el('p','AI 분석을 연결하지 못했어요. Vercel OPENAI_API_KEY 설정을 확인해 주세요. 대화 내용은 자동으로 서버에 저장되지 않습니다.'));renderDue();}
+   record.feedback=data;record.error='';queuePractice(data.nextPractice||[]);
+  }catch(e){record.error='AI 피드백을 가져오지 못했어요. 브라우저 AI 설정과 네트워크를 확인해 주세요. 대화 기록은 저장됐습니다.';}
+  past=read(HISTORY,[]);const index=past.findIndex(x=>x.id===record.id);
+  if(index!==-1){past[index]=record;write(HISTORY,past);}
+  if(section.dataset.sessionId===record.id||!section.dataset.sessionId){showSession(record,section);}
+  window.talkRenderHistory?.();
  };
+ window.talkRenderHistory=function(){
+  const container=$('talk-history-list');if(!container)return;
+  container.replaceChildren();
+  const past=read(HISTORY,[]);
+  if(!past.length){container.append(el('p','아직 저장된 대화가 없어요.'));return;}
+  past.slice().reverse().forEach((record,i)=>{
+   const index=past.length-1-i;
+   const button=el('button',new Date(record.date).toLocaleString('ko-KR')+' · '+record.topic+' · '+record.turns+'회 말하기','btn talk-history-button');
+   button.type='button';button.addEventListener('click',()=>window.talkShowPast(index));container.append(button);
+  });
+ };
+ window.addEventListener('DOMContentLoaded',()=>window.talkRenderHistory());
  const oldReset=window.talkReset;window.talkReset=function(){const feedback=$('talk-feedback');if(feedback){feedback.hidden=true;feedback.replaceChildren();}oldReset?.();};
 })();

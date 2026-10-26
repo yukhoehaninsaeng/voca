@@ -281,8 +281,17 @@
 </section>
 <section class="screen hub-screen" id="s-retrieval" aria-labelledby="retrieval-title">
 <div class="hub-page-title"><span>SPEAKING AUTOMATION</span><h1 id="retrieval-title">순간 문장 만들기</h1><p>아는 단어를 실제 영어 문장으로 꺼내는 연습</p></div>
+<section id="speaking-plan" class="speaking-plan" aria-labelledby="speaking-plan-title">
+<div class="speaking-plan-head"><div><small>PERSONALIZED PRACTICE</small><h2 id="speaking-plan-title">오늘의 맞춤 말하기</h2><p id="speaking-plan-date"></p></div><button class="btn" id="speaking-plan-refresh" type="button">추천 새로고침</button></div>
+<div class="speaking-metrics" id="speaking-progress-stats" aria-label="말하기 학습 현황"></div>
+<p class="speaking-plan-desc">이전 답변에서 힌트를 많이 사용했거나 아직 연습하지 않은 표현을 우선 추천해요.</p>
+<ol class="speaking-daily-list" id="speaking-daily-list"></ol>
+<p class="speaking-weakness" id="speaking-weakness"></p>
+<p class="speaking-weakness" id="speaking-expansion-stats"></p>
+<button class="btn primary btn-wide" id="speaking-plan-start" type="button">오늘의 5문장 연습 시작</button>
+</section>
 <div class="card retrieval-card">
-<div class="retrieval-heading"><strong>오늘의 문장 인출 훈련</strong><span>PHASE 1 + 2</span></div>
+<div class="retrieval-heading"><strong>오늘의 문장 인출 훈련</strong><span>PHASE 1 + 2 + 3</span></div>
 <p class="retrieval-guide">한국어 상황을 보고 먼저 영어로 말해 보세요. 완벽한 정답보다 스스로 꺼내는 과정이 중요해요.</p>
 <div class="retrieval-question"><small>영어로 어떻게 말할까요?</small><h2 id="retrieval-prompt">문제를 준비하고 있어요.</h2></div>
 <p class="retrieval-pattern"><strong>오늘의 패턴:</strong> <span id="retrieval-pattern"></span></p>
@@ -438,6 +447,7 @@
 <script src="js/free-talk.js"></script>
 <script src="js/sentence-retrieval.js"></script>
 <script src="js/sentence-expansion.js"></script>
+<script src="js/speaking-personalization.js"></script>
 
 <script src="js/talk-coach.js"></script>
 <script src="js/voca-user-data.js"></script>

@@ -102,7 +102,7 @@
   $('retrieval-correct').addEventListener('click',()=>grade(true));
   $('retrieval-retry').addEventListener('click',()=>grade(false));
   $('retrieval-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();check();}});
-  window.addEventListener('voca-retrieval-select',e=>{const id=e.detail?.id;if(tasks.some(t=>t.id===id)){queue=[id];next();}});
+  window.addEventListener('voca-retrieval-select',e=>{const ids=Array.isArray(e.detail?.ids)?e.detail.ids:[e.detail?.id];queue=ids.filter(id=>tasks.some(t=>t.id===id));if(queue.length)next();});
   next();
  });
 })();

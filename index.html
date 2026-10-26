@@ -43,7 +43,7 @@
 <div class="page-wrap">
   <header>
     <div>
-      <div class="logo">VocaMate</div>
+      <div class="brand-with-mascot"><img class="brand-mascot" src="assets/mascot-front.svg" alt="" width="46" height="36"/><div class="logo">VocaMate</div></div>
       <span class="logo-sub">🦖 오늘도 영어 한 걸음</span>
     </div>
     <div class="header-right">
@@ -105,7 +105,7 @@
 
   <!-- ② LEARN DASHBOARD -->
   <div class="screen on" id="s-learn">
-    <div class="home-welcome"><span class="home-eyebrow">MY ENGLISH JOURNEY</span><h1>오늘도 한 걸음씩 🦖</h1><p>어제보다 더 자연스럽게 말하는 하루</p></div>
+    <div class="home-welcome"><img class="welcome-mascot" src="assets/mascot-side.svg" alt="빨간 망토를 두른 초록색 아기 티라노 마스코트" width="112" height="84"/><span class="home-eyebrow">MY ENGLISH JOURNEY</span><h1>오늘도 한 걸음씩 🦖</h1><p>어제보다 더 자연스럽게 말하는 하루</p></div>
     <section class="today-card" aria-labelledby="today-title">
       <div class="today-kicker">TODAY</div><h1 id="today-title">오늘 학습</h1>
       <p id="today-duration">오늘 약 0분</p>
@@ -266,7 +266,7 @@
   </section>
   <section class="screen hub-screen" id="s-talk" aria-labelledby="talk-title">
 <div class="hub-page-title"><span>ENGLISH CONVERSATION</span><h1 id="talk-title">AI 프리토킹</h1><p>마이크를 누르고 영어로 자유롭게 대화해 보세요.</p></div>
-<div class="talk-card"><div class="talk-avatar" aria-hidden="true">🦖</div><strong>My English Buddy</strong><div id="talk-mode" class="talk-mode">연결 상태 확인 중</div>
+<div class="talk-card"><div class="talk-avatar" aria-hidden="true"><img src="assets/mascot-front.svg" alt="" width="112" height="84"/></div><strong>My English Buddy</strong><div id="talk-mode" class="talk-mode">연결 상태 확인 중</div>
 <label for="talk-topic">대화 주제</label><select id="talk-topic" onchange="talkReset()"><option value="daily life">일상생활</option><option value="food">음식과 요리</option><option value="work">회사 생활</option><option value="weekend">주말과 취미</option><option value="toeic">토익스피킹 연습</option></select>
 <div id="talk-log" class="talk-log" role="log" aria-live="polite"></div><p id="talk-status" role="status" class="talk-status">준비 중</p>
 <button id="talk-mic" type="button" class="btn primary talk-mic" onclick="talkStart()" aria-pressed="false">🎤 마이크로 말하기</button>

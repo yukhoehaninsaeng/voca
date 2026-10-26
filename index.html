@@ -377,7 +377,7 @@
       <label class="field-label">OpenAI 모델<input id="voca-openai-model" type="text" autocomplete="off" placeholder="gpt-4o-mini"/></label>
       <label class="field-label">Anthropic API 키<input id="voca-anthropic-key" type="password" autocomplete="off" placeholder="sk-ant-..." /></label>
       <label class="field-label">Anthropic 모델<input id="voca-anthropic-model" type="text" autocomplete="off" placeholder="claude-haiku-4-5-20251001"/></label>
-      <div class="voca-data-actions"><button class="btn primary" id="voca-save-ai" type="button">AI 설정 저장</button><button class="btn" id="voca-clear-ai" type="button">API 키 삭제</button></div>
+      <div class="voca-data-actions"><button class="btn primary" id="voca-save-ai" type="button">AI 설정 저장</button><button class="btn" id="voca-test-ai" type="button">AI 연결 테스트</button><button class="btn" id="voca-clear-ai" type="button">API 키 삭제</button></div>
       <h3>내 학습 데이터 백업 · 복원</h3>
       <p>단어, 문장, SRS, 학습 기록, 프로필, AI 설정을 암호화된 파일 하나로 옮길 수 있어요. 키도 암호화되어 포함됩니다.</p>
       <label class="field-label">백업 암호 (10자 이상)<input id="voca-backup-password" type="password" autocomplete="new-password" placeholder="복원 시에도 동일한 암호 필요"/></label>
@@ -408,9 +408,10 @@
 <script src="js/app.js"></script>
 <script src="js/mobile-hub-fixes.js"></script>
 <script src="js/free-talk.js"></script>
-<script src="js/ai-provider-settings.js"></script>
+
 <script src="js/talk-coach.js"></script>
 <script src="js/voca-user-data.js"></script>
 <script src="js/browser-ai-adapter.js"></script>
+<script src="js/ai-status-v2.js"></script>
 </body>
 </html>

@@ -42,3 +42,12 @@
 #s-talk .talk-recording-help{text-align:center}
 @keyframes talk-wave{from{height:5px}to{height:25px}}
 @media(prefers-reduced-motion:reduce){#s-talk .talk-call-wave i{animation:none!important}}
+
+#s-talk .talk-auto-turn{display:flex;gap:12px;align-items:center;padding:14px;border:1px solid #d5e5da;border-radius:14px;background:#f2f9f4;margin:14px 0;cursor:pointer}
+#s-talk .talk-auto-turn input{width:19px;height:19px;accent-color:#267451;flex:none}
+#s-talk .talk-auto-turn span{display:grid;gap:4px}
+#s-talk .talk-auto-turn strong{font-size:.88rem;color:#24543a}
+#s-talk .talk-auto-turn small{font-size:.76rem;line-height:1.4;color:#607b69}
+#s-talk .talk-pattern-panel{background:#edf6ef;border:1px solid #d2e5d6;border-radius:16px;padding:15px;margin:15px 0}
+#s-talk .talk-pattern-panel h3{font-size:1rem;margin:0 0 10px}
+#s-talk .talk-pattern-panel p{font-size:.83rem;line-height:1.5}
